@@ -45,14 +45,14 @@ class MainHandler(webapp.RequestHandler):
         plan = self.request.get('plan', 'full')
         
         if not first_name or not last_name or not email:
-            self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod,'message': "Sorry, we need all three fields."}))
+            self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod, 'plan': plan, 'message': "Sorry, we need all three fields."}))
         else:
             existing_member = Membership.all().filter('email =', email).get()
             if existing_member:
                 if existing_member.status == 'unpaid':
                     existing_member.delete()
                 else:
-                    self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod,'message': "You're already in our system!"}))
+                    self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod, 'plan': plan, 'message': "You're already in our system!"}))
                     return
             m = Membership(first_name=first_name, last_name=last_name, email=email, plan=plan)
             m.hash = hashlib.md5(m.email).hexdigest()
