@@ -1,0 +1,18 @@
+body { font-family: Verdana,Arial,sans-serif; }
+#wrapper { margin-left: auto; margin-right: auto; width: 700px; }
+
+#header { margin-left: auto; margin-right: auto; width: 500px; height: 125px;}
+#header img { margin-right: 10px;}
+#header h1 { font-size: 42px; margin-top: 20px; padding-top: 10px; margin-bottom: 0px; padding-bottom: 0px;}
+#header h2 { font-size: x-large; margin: 0px; }
+
+.step span { color: white; background-color: #b10026; padding: 1px; padding-left: 4px; padding-right: 4px;}
+.step.inactive span { background-color: gray;}
+.step.inactive { color: gray; }
+
+h4 { margin-bottom: 0px;}
+
+table { margin-top: 50px;}
+table .label { text-align: right; width: 210px;}
+
+form div { margin-top: 10px; }

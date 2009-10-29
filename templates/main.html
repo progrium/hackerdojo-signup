@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<h4>
+  <span class="step"><span>1</span> Member Information &rarr; </span>
+  <span class="step inactive"><span>2</span> Billing Information &rarr; </span>
+  <span class="step inactive"><span>3</span> Welcome to the Dojo!</span>
+</h4>
+
+<form action="/" method="post">
+  <input type="hidden" name="plan" value="{{ plan }}" />
+<table>
+  <tr><td class="label">First name:</td><td><input type="text" name="first_name" /></td></tr>
+  <tr><td class="label">Last name:</td><td><input type="text" name="last_name" /></td></tr>
+  <tr><td class="label">Email:</td><td><input type="text" name="email" /></td></tr>
+  {% if message %}<tr><td>&nbsp;</td><td style="color: red; font-size: smaller;">{{ message }}</td></tr>{% endif %}
+</table>
+<div style="font-size: smaller; margin-left: 216px;">How did you hear about us?<br />
+  <input type="text" name="referrer" /><br />
+  <input type="submit" value="Increment step &rarr;" style="font-size: large; margin-top: 25px;" /><br />
+  <span style="font-size: 11px">You will be taken to <a href="http://spreedly.com/">Spreedly</a> for payment.</span>
+</div>
+
+
+</form>
+{% endblock %}

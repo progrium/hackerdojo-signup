@@ -1,0 +1,29 @@
+<html>
+  <head>
+    <title>Hacker Dojo Member Signup</title>
+    <link href="/static/style.css" type="text/css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="wrapper">
+      <div id="header">
+        <img src="/static/dojo_icon.png" style="float: left; " />
+        <h1>Hacker Dojo</h1>
+        <h2>Member Signup</h2>
+      </div>
+      <div id="content">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+    {% if is_prod %}
+    <script type="text/javascript">
+    var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+    document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+    </script>
+    <script type="text/javascript">
+    try {
+    var pageTracker = _gat._getTracker("UA-11332872-2");
+    pageTracker._trackPageview();
+    } catch(err) {}</script>
+    {% endif %}
+  </body>
+</html>
