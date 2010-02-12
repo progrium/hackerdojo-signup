@@ -1,8 +1,8 @@
 import wsgiref.handlers
-import time, hashlib, urllib, urllib2, re, os
+import datetime, time, hashlib, urllib, urllib2, re, os
 from google.appengine.ext import db
 from google.appengine.ext import webapp
-from google.appengine.api import urlfetch
+from google.appengine.api import urlfetch, mail
 from google.appengine.ext.webapp import template
 
 try:
@@ -18,17 +18,20 @@ if is_dev:
 else:
     SPREEDLY_ACCOUNT = 'hackerdojo'
     SPREEDLY_APIKEY = keys.hackerdojo
-    PLAN_IDS = {'full': '1987', 'hardship': '2537', 'supporter': '1988', 'director': '2539'}
+    PLAN_IDS = {'full': '1987', 'hardship': '2537', 'supporter': '1988', 'family': '3659', 'minor': '3660'}
 
 is_prod = not is_dev
 
+def build_subscriber_url(account):
+    return "https://spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, account.token)
+
 class Membership(db.Model):
+    hash = db.StringProperty()
     first_name = db.StringProperty(required=True)
     last_name = db.StringProperty(required=True)
     email = db.StringProperty(required=True)
-    hash = db.StringProperty()
     plan  = db.StringProperty(required=True)
-    status  = db.StringProperty(default='unpaid') # unpaid, active, canceled, pending (approval)
+    status  = db.StringProperty() # None, active, suspended
     referrer  = db.StringProperty()
     
     created = db.DateTimeProperty(auto_now_add=True)
@@ -95,11 +98,26 @@ class UpdateHandler(webapp.RequestHandler):
                 pass
         self.response.out.write("ok")
             
+class CleanupHandler(webapp.RequestHandler):
+    def get(self):
+        self.post()
         
+    def post(self):
+        deleted_emails = []
+        for membership in Membership.all().filter('status =', None):
+            if (datetime.date.today() - membership.created.date()).days > 5:
+                deleted_emails.append(membership.email)
+                membership.delete()
+        if deleted_emails:
+            mail.send_mail(sender="Signup <no-reply@hackerdojo-signup.appspotmail.com>",
+                to="Jeff Lindsay <progrium@gmail.com>",
+                subject="Recent almost members",
+                body='\n'.join(deleted_emails))
 
 def main():
     application = webapp.WSGIApplication([
         ('/', MainHandler),
+        ('/cleanup', CleanupHandler),
         ('/success.*', SuccessHandler),
         ('/update', UpdateHandler),], debug=True)
     wsgiref.handlers.CGIHandler().run(application)
