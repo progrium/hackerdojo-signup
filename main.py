@@ -4,6 +4,7 @@ from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.api import urlfetch, mail
 from google.appengine.ext.webapp import template
+import spreedly
 
 try:
     is_dev = os.environ['SERVER_SOFTWARE'].startswith('Dev')
@@ -33,6 +34,9 @@ class Membership(db.Model):
     plan  = db.StringProperty(required=True)
     status  = db.StringProperty() # None, active, suspended
     referrer  = db.StringProperty()
+    username = db.StringProperty()
+    
+    spreedly_token = db.StringProperty()
     
     created = db.DateTimeProperty(auto_now_add=True)
     updated = db.DateTimeProperty(auto_now=True)
@@ -76,26 +80,21 @@ class SuccessHandler(webapp.RequestHandler):
         self.response.out.write(template.render('templates/success.html', locals()))
 
 class UpdateHandler(webapp.RequestHandler):
-    def post(self):
+    def get(self):
+        pass
+    
+    def post(self, ids=None):
         subscriber_ids = self.request.get('subscriber_ids').split(',')
+        s = spreedly.Spreedly(SPREEDLY_ACCOUNT, token=SPREEDLY_APIKEY)
         for id in subscriber_ids:
-            uri = 'https://spreedly.com/api/v4/%s/subscribers/%s.xml' % (SPREEDLY_ACCOUNT, id)
-            auth_handler = urllib2.HTTPBasicAuthHandler()
-            auth_handler.add_password(realm='Web Password', uri=uri, user=SPREEDLY_APIKEY, passwd='X')
-            opener = urllib2.build_opener(auth_handler)
-            urllib2.install_opener(opener)
-            try:
-                f = urllib2.urlopen(uri)
-                body = f.read()
-                p = re.compile('<customer-id>(\d+)</customer-id>')
-                m = p.search(body)
-                if m:
-                    member = Membership.get_by_id(int(m.group(1)))
-                    if '<active type="boolean">true</active>' in body:
-                        member.status = 'active'
-                        member.put()
-            except:
-                pass
+            subscriber = s.subscriber_details(sub_id=int(id))
+            member = Membership.get_by_id(int(subscriber['customer-id']))
+            #old_status = member.status
+            member.status = 'active' if subscriber['active'] == 'true' else 'suspended'
+            member.spreedly_token = subscriber['token']
+            member.plan = subscriber['feature-level'] or member.plan
+            member.email = subscriber['email']
+            member.put()
         self.response.out.write("ok")
             
 class CleanupHandler(webapp.RequestHandler):
