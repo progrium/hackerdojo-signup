@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<h4>
+  <span class="step inactive"><span>1</span> Member Info &rarr; </span>
+  <span class="step inactive"><span>2</span> Billing Info &rarr; </span>
+	<span class="step"><span>3</span> Create Account &rarr; </span>
+  <span class="step inactive"><span>4</span> Done!</span>
+</h4>
+<div style="margin-left: 50px; padding-top: 10px;">
+	<form action="{{self.request.path}}" method="post">
+	<table>
+		{% if message %}<tr><td>&nbsp;</td><td style="color: red; font-size: smaller;">{{ message }}</td></tr>{% endif %}
+	  <tr><td class="label">Username:</td><td>{% if pick_username %}<input type="text" name="username" value="{{username}}" />{% else %}<strong>{{ username }}</strong><input type="hidden" name="username" value="{{username}}" />{% endif %} @hackerdojo.com</td></tr>
+	  <tr><td class="label">Password:</td><td><input type="password" name="password" /></td></tr>
+	  <tr><td class="label">Confirm:</td><td><input type="password" name="password_confirm" /></td></tr>
+	</table>
+	<div style="font-size: smaller; margin-left: 216px;">
+	 	<input type="submit" value="Finish &rarr;" />
+	<br />
+	<br />
+	<a href="{{ login_url }}">Already have a user account?</a>
+	</div>
+
+
+	</form>	
+
+</div>
+{% endblock %}

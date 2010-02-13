@@ -1,4 +1,4 @@
-application: hackerdojo-signup
+application: hd-signup
 version: 1
 runtime: python
 api_version: 1
@@ -12,5 +12,7 @@ handlers:
   upload: static/robots.txt
 - url: /static
   static_dir: static
+- url: /remote_api
+  script: $PYTHON_LIB/google/appengine/ext/remote_api/handler.py
 - url: .*
   script: main.py

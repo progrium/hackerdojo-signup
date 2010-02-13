@@ -10,7 +10,7 @@ body { font-family: Verdana,Arial,sans-serif; }
 .step.inactive span { background-color: gray;}
 .step.inactive { color: gray; }
 
-h4 { margin-bottom: 0px;}
+h4 { margin-bottom: 0px; padding-left: 50px;}
 
 table { margin-top: 50px;}
 table .label { text-align: right; width: 210px;}

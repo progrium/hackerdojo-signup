@@ -1,13 +1,15 @@
 {% extends 'base.html' %}
 {% block content %}
 <h4>
-  <span class="step"><span>1</span> Member Information &rarr; </span>
-  <span class="step inactive"><span>2</span> Billing Information &rarr; </span>
-  <span class="step inactive"><span>3</span> Welcome to the Dojo!</span>
+  <span class="step"><span>1</span> Member Info &rarr; </span>
+  <span class="step inactive"><span>2</span> Billing Info &rarr; </span>
+	<span class="step inactive"><span>3</span> Create Account &rarr; </span>
+  <span class="step inactive"><span>4</span> Done!</span>
 </h4>
 
 <form action="/" method="post">
   <input type="hidden" name="plan" value="{{ plan }}" />
+	{% if paypal %}<input type="hidden" name="paypal" value="1" />{% endif %}
 <table>
   <tr><td class="label">First name:</td><td><input type="text" name="first_name" /></td></tr>
   <tr><td class="label">Last name:</td><td><input type="text" name="last_name" /></td></tr>
