@@ -179,9 +179,9 @@ class NeedAccountHandler(webapp.RequestHandler):
         if not email:
             self.redirect(self.request.path)
         else:
-            member = Membership.all().filter('email =', email).get()
+            member = Membership.all().filter('email =', email).filter('status =', 'active').get()
             if not member:
-                self.redirect(self.request.path + '?message=There is no record of that email.')
+                self.redirect(self.request.path + '?message=There is no active record of that email.')
             else:
                 mail.send_mail(sender=EMAIL_FROM,
                     to="%s <%s>" % (member.full_name(), member.email),
