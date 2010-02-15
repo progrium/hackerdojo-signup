@@ -151,6 +151,10 @@ class AccountHandler(webapp.RequestHandler):
                 if username in usernames:
                     m.username = username
                     m.put()
+                    mail.send_mail(sender=EMAIL_FROM,
+                        to="%s <%s>" % (m.full_name(), m.email),
+                        subject="Hacker Dojo account created: %s" % m.username,
+                        body="""Hello,\n\nPlease note your Hacker Dojo username is: %s\n\nYou will be able to use this for various services provided by Hacker Dojo. If you forget your password, email brian.klug@hackerdojo.com""" % m.username)
                     self.redirect('/success/%s' % hash)
                 else:
                     mail.send_mail(sender=EMAIL_FROM,
