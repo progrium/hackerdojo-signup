@@ -29,8 +29,6 @@ else:
 
 is_prod = not is_dev
 
-def build_subscriber_url(account):
-    return "https://spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, account.token)
 
 def fetch_usernames(use_cache=True):
     usernames = memcache.get('usernames')
@@ -61,6 +59,9 @@ class Membership(db.Model):
     
     def full_name(self):
         return '%s %s' % (self.first_name, self.last_name)
+    
+    def spreedly_url(self):
+        return "https://spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, self.spreedly_token)
 
 class MainHandler(webapp.RequestHandler):
     def get(self):
@@ -151,11 +152,7 @@ class AccountHandler(webapp.RequestHandler):
                 if username in usernames:
                     m.username = username
                     m.put()
-                    mail.send_mail(sender=EMAIL_FROM,
-                        to="%s <%s>" % (m.full_name(), m.email),
-                        subject="Hacker Dojo account created: %s" % m.username,
-                        body="""Hello,\n\nPlease note your Hacker Dojo username is: %s\n\nYou will be able to use this for various services provided by Hacker Dojo. If you forget your password, email brian.klug@hackerdojo.com""" % m.username)
-                    self.redirect('/success/%s' % hash)
+                    self.redirect('/success/%s?email' % hash)
                 else:
                     mail.send_mail(sender=EMAIL_FROM,
                         to="Jeff Lindsay <progrium@gmail.com>",
@@ -165,13 +162,20 @@ class AccountHandler(webapp.RequestHandler):
             
 
 class SuccessHandler(webapp.RequestHandler):
-    def get(self):
-        success_html = urlfetch.fetch("http://hackerdojo.pbworks.com/api_v2/op/GetPage/page/SubscriptionSuccess/_type/html").content
-        member = Membership.all().filter('hash =', self.request.path.split('/')[-1]).get()
+    def get(self, hash):
+        member = Membership.all().filter('hash =', hash).get()
         if member:
-            success_html = success_html.replace('joining!', 'joining, %s!' % member.first_name)
-        is_prod = not is_dev
-        self.response.out.write(template.render('templates/success.html', locals()))
+            if self.request.query_string == 'email':
+                mail.send_mail(sender=EMAIL_FROM,
+                    to="%s <%s>" % (member.full_name(), member.email),
+                    subject="Welcome to Hacker Dojo, %s!" % member.first_name,
+                    body=template.render('templates/welcome.txt', locals()))
+                self.redirect(self.request.path)
+            else:
+                success_html = urlfetch.fetch("http://hackerdojo.pbworks.com/api_v2/op/GetPage/page/SubscriptionSuccess/_type/html").content
+                success_html = success_html.replace('joining!', 'joining, %s!' % member.first_name)
+                is_prod = not is_dev
+                self.response.out.write(template.render('templates/success.html', locals()))
 
 class NeedAccountHandler(webapp.RequestHandler):
     def get(self):
@@ -238,7 +242,7 @@ def main():
         ('/cleanup', CleanupHandler),
         ('/account/(.+)', AccountHandler),
         ('/upgrade/needaccount', NeedAccountHandler),
-        ('/success.*', SuccessHandler),
+        ('/success/(.+)', SuccessHandler),
         ('/update', UpdateHandler),
         ('/key/(.+)', keymaster.Handler({
             'api-secret': ('c94d981ca589581cd270439854f08679', '1w5q7v3h'),

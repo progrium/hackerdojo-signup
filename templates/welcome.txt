@@ -1,0 +1,12 @@
+Hello and welcome to our community!
+
+Save this email because it contains important information regarding your membership.
+
+First of all, you can manage your membership subscription with this link:
+{{member.spreedly_url}}
+
+Secondly, your Hacker Dojo username is: {{member.username}}
+
+You will be able to use this for various services provided by Hacker Dojo. If you forget your password, email brian.klug@hackerdojo.com
+
+If you'd like to use {{member.username}}@hackerdojo.com or set up forwarding to this email address, go to Hacker Dojo email at: http://mail.hackerdojo.com
