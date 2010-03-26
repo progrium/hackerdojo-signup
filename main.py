@@ -106,30 +106,30 @@ class AccountHandler(webapp.RequestHandler):
             s = spreedly.Spreedly(SPREEDLY_ACCOUNT, token=SPREEDLY_APIKEY)
             valid_acct = False
             try:
-              subscriber = s.subscriber_details(sub_id=int(m.key().id()))
-              valid_acct = True
-            except SpreedlyResponseError:
-              pass
-            if valid_acct == True:
-              user = users.get_current_user()
-              if user:
-                  m.username = user.nickname().split('@')[0]
-                  m.put()
-                  self.redirect(users.create_logout_url('/success/%s' % hash))
-              else:
-                  if not keymaster.get('api-secret'):
-                      keymaster.request('api-secret')
-                  message = self.request.get('message')
-                  p = re.compile(r'[^\w]')
-                  username = '.'.join([p.sub('', m.first_name), p.sub('', m.last_name)]).lower()
-                  if username in fetch_usernames():
-                      username = m.email.split('@')[0]
-                  if self.request.get('u'):
-                      pick_username = True
-                  login_url = users.create_login_url(self.request.path)
-                  self.response.out.write(template.render('templates/account.html', locals()))
+                subscriber = s.subscriber_details(sub_id=int(m.key().id()))
+                valid_acct = subscriber['active'] == 'true'
+            except spreedly.SpreedlyResponseError:
+                pass
+            if valid_acct:
+                user = users.get_current_user()
+                if user:
+                    m.username = user.nickname().split('@')[0]
+                    m.put()
+                    self.redirect(users.create_logout_url('/success/%s' % hash))
+                else:
+                    if not keymaster.get('api-secret'):
+                        keymaster.request('api-secret')
+                    message = self.request.get('message')
+                    p = re.compile(r'[^\w]')
+                    username = '.'.join([p.sub('', m.first_name), p.sub('', m.last_name)]).lower()
+                    if username in fetch_usernames():
+                        username = m.email.split('@')[0]
+                    if self.request.get('u'):
+                        pick_username = True
+                    login_url = users.create_login_url(self.request.path)
+                    self.response.out.write(template.render('templates/account.html', locals()))
             else:
-              self.redirect("/")
+                self.redirect("/")
     
     def post(self, hash):
         username = self.request.get('username')
@@ -143,20 +143,21 @@ class AccountHandler(webapp.RequestHandler):
                 self.redirect(self.request.path + "?message=There was a caching error, please try again.")
             else:
                 m = Membership.all().filter('hash =', hash).get()
-
-                try:
-                    resp = urlfetch.fetch('http://hackerdojo-domain.appspot.com/users', method='POST', payload=urllib.urlencode({
-                        'username': username,
-                        'password': password,
-                        'first_name': m.first_name,
-                        'last_name': m.last_name,
-                        'secret': keymaster.get('api-secret'),
-                    }), deadline=10)
-                    if 'try again'  in resp.content:
-                        self.redirect(self.request.path + "?message=There was a caching error, please try again.")
-                        return
-                except urlfetch.DownloadError:
-                    pass
+                
+                if m.spreedly_token:
+                    try:
+                        resp = urlfetch.fetch('http://hackerdojo-domain.appspot.com/users', method='POST', payload=urllib.urlencode({
+                            'username': username,
+                            'password': password,
+                            'first_name': m.first_name,
+                            'last_name': m.last_name,
+                            'secret': keymaster.get('api-secret'),
+                        }), deadline=10)
+                        if 'try again'  in resp.content:
+                            self.redirect(self.request.path + "?message=There was a caching error, please try again.")
+                            return
+                    except urlfetch.DownloadError:
+                        pass
                 
                 usernames = fetch_usernames(False)
                 if username in usernames:
@@ -167,7 +168,7 @@ class AccountHandler(webapp.RequestHandler):
                     mail.send_mail(sender=EMAIL_FROM,
                         to="Jeff Lindsay <progrium@gmail.com>",
                         subject="Error creating account",
-                        body=resp.content)
+                        body=resp.content if m.spreedly_token else "Attempt to make user without paying: " + self.request.remote_addr)
                     self.redirect(self.request.path + "?message=There was a problem creating your account. Please contact an admin.")
             
 
