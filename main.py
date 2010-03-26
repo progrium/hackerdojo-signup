@@ -103,23 +103,33 @@ class AccountHandler(webapp.RequestHandler):
         if m.username:
             self.redirect('/success/%s' % hash)
         else:
-            user = users.get_current_user()
-            if user:
-                m.username = user.nickname().split('@')[0]
-                m.put()
-                self.redirect(users.create_logout_url('/success/%s' % hash))
+            s = spreedly.Spreedly(SPREEDLY_ACCOUNT, token=SPREEDLY_APIKEY)
+            valid_acct = False
+            try:
+              subscriber = s.subscriber_details(sub_id=int(m.key().id()))
+              valid_acct = True
+            except SpreedlyResponseError:
+              pass
+            if valid_acct == True:
+              user = users.get_current_user()
+              if user:
+                  m.username = user.nickname().split('@')[0]
+                  m.put()
+                  self.redirect(users.create_logout_url('/success/%s' % hash))
+              else:
+                  if not keymaster.get('api-secret'):
+                      keymaster.request('api-secret')
+                  message = self.request.get('message')
+                  p = re.compile(r'[^\w]')
+                  username = '.'.join([p.sub('', m.first_name), p.sub('', m.last_name)]).lower()
+                  if username in fetch_usernames():
+                      username = m.email.split('@')[0]
+                  if self.request.get('u'):
+                      pick_username = True
+                  login_url = users.create_login_url(self.request.path)
+                  self.response.out.write(template.render('templates/account.html', locals()))
             else:
-                if not keymaster.get('api-secret'):
-                    keymaster.request('api-secret')
-                message = self.request.get('message')
-                p = re.compile(r'[^\w]')
-                username = '.'.join([p.sub('', m.first_name), p.sub('', m.last_name)]).lower()
-                if username in fetch_usernames():
-                    username = m.email.split('@')[0]
-                if self.request.get('u'):
-                    pick_username = True
-                login_url = users.create_login_url(self.request.path)
-                self.response.out.write(template.render('templates/account.html', locals()))
+              self.redirect("/")
     
     def post(self, hash):
         username = self.request.get('username')
