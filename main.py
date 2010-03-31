@@ -81,7 +81,7 @@ class MainHandler(webapp.RequestHandler):
         else:
             existing_member = Membership.all().filter('email =', email).get()
             if existing_member:
-                if existing_member.status == None:
+                if existing_member.status in [None, 'paypal']:
                     existing_member.delete()
                 else:
                     self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod, 'plan': plan, 'message': "You're already in our system!"}))
