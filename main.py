@@ -5,9 +5,12 @@ from google.appengine.ext import webapp
 from google.appengine.api import urlfetch, mail, memcache, users
 from google.appengine.ext.webapp import template
 from django.utils import simplejson
+from pprint import pprint
 import logging
 import spreedly
 import keymaster
+import base64
+import sys
 
 APP_NAME = 'hd-signup'
 EMAIL_FROM = "Dojo Signup <no-reply@%s.appspotmail.com>" % APP_NAME
@@ -18,6 +21,7 @@ except:
     is_dev = False
 
 import keys
+
 if is_dev:
     SPREEDLY_ACCOUNT = 'hackerdojotest'
     SPREEDLY_APIKEY = keys.hackerdojotest
@@ -95,6 +99,20 @@ class MainHandler(webapp.RequestHandler):
             id = str(m.key().id())
             username = "%s-%s-%s" % (m.first_name.lower(), m.last_name.lower(), id)
             query_str = urllib.urlencode({'first_name': m.first_name, 'last_name': m.last_name, 'email': m.email, 'return_url': 'http://%s/account/%s' % (self.request.host, m.hash)})
+
+            if "maker" in m.referrer.lower():
+              key = SPREEDLY_APIKEY
+              encoded = base64.b64encode( key+':X')
+              authstr = "Basic "+encoded
+              mheaders = {'Authorization':authstr,'Content-Type':'application/xml'}
+              # Create subscriber
+              data = "<subscriber><customer-id>%s</customer-id></subscriber>" % (id)
+              resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers.xml" % (SPREEDLY_ACCOUNT), method='POST',  payload=data, headers = mheaders, deadline=10)
+              # Credit
+              data = "<credit><amount>30.00</amount></credit>"
+              resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers/%s/credits.xml" % (SPREEDLY_ACCOUNT, id), method='POST',  payload=data, headers = mheaders, deadline=10)
+
+                        
             self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % (SPREEDLY_ACCOUNT, id, PLAN_IDS[m.plan], username, query_str))
 
 class AccountHandler(webapp.RequestHandler):
