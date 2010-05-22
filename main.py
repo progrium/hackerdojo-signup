@@ -106,7 +106,7 @@ class MainHandler(webapp.RequestHandler):
               authstr = "Basic "+encoded
               mheaders = {'Authorization':authstr,'Content-Type':'application/xml'}
               # Create subscriber
-              data = "<subscriber><customer-id>%s</customer-id></subscriber>" % (id)
+              data = "<subscriber><customer-id>%s</customer-id><email>%s</email></subscriber>" % (id,email)
               resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers.xml" % (SPREEDLY_ACCOUNT), method='POST',  payload=data, headers = mheaders, deadline=10)
               # Credit
               data = "<credit><amount>30.00</amount></credit>"
