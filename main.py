@@ -100,7 +100,7 @@ class MainHandler(webapp.RequestHandler):
             username = "%s-%s-%s" % (m.first_name.lower(), m.last_name.lower(), id)
             query_str = urllib.urlencode({'first_name': m.first_name, 'last_name': m.last_name, 'email': m.email, 'return_url': 'http://%s/account/%s' % (self.request.host, m.hash)})
 
-            if "maker" in m.referrer.lower():
+            if "maker00000" in m.referrer.lower():
               key = SPREEDLY_APIKEY
               encoded = base64.b64encode( key+':X')
               authstr = "Basic "+encoded
