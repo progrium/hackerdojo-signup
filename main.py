@@ -17,14 +17,13 @@ try:
 except:
     is_dev = False
 
-import keys
 if is_dev:
     SPREEDLY_ACCOUNT = 'hackerdojotest'
-    SPREEDLY_APIKEY = keys.hackerdojotest
+    SPREEDLY_APIKEY = keymaster.get('spreedly:hackerdojotest')
     PLAN_IDS = {'full': '1957'}
 else:
     SPREEDLY_ACCOUNT = 'hackerdojo'
-    SPREEDLY_APIKEY = keys.hackerdojo
+    SPREEDLY_APIKEY = keymaster.get('spreedly:hackerdojo')
     PLAN_IDS = {'full': '1987', 'hardship': '2537', 'supporter': '1988', 'family': '3659', 'minor': '3660'}
 
 is_prod = not is_dev
@@ -35,7 +34,7 @@ def fetch_usernames(use_cache=True):
     if usernames and use_cache:
         return usernames
     else:
-        resp = urlfetch.fetch('http://hackerdojo-domain.appspot.com/users', deadline=10)
+        resp = urlfetch.fetch('http://domain.hackerdojo.com/users', deadline=10)
         if resp.status_code == 200:
             usernames = [m.lower() for m in simplejson.loads(resp.content)]
             if not memcache.set('usernames', usernames, 3600*24):
@@ -117,8 +116,6 @@ class AccountHandler(webapp.RequestHandler):
                     m.put()
                     self.redirect(users.create_logout_url('/success/%s' % hash))
                 else:
-                    if not keymaster.get('api-secret'):
-                        keymaster.request('api-secret')
                     message = self.request.get('message')
                     p = re.compile(r'[^\w]')
                     username = '.'.join([p.sub('', m.first_name), p.sub('', m.last_name)]).lower()
@@ -139,37 +136,32 @@ class AccountHandler(webapp.RequestHandler):
         elif len(password) < 6:
             self.redirect(self.request.path + "?message=Password must be 6 characters or longer")
         else:
-            if not keymaster.get('api-secret'):
-                self.redirect(self.request.path + "?message=There was a caching error, please try again.")
+            m = Membership.all().filter('hash =', hash).get()
+            
+            if m and m.spreedly_token:
+                try:
+                    resp = urlfetch.fetch('http://domain.hackerdojo.com/users', method='POST', payload=urllib.urlencode({
+                        'username': username,
+                        'password': password,
+                        'first_name': m.first_name,
+                        'last_name': m.last_name,
+                        'secret': keymaster.get('api@hackerdojo.com'),
+                    }), deadline=10)
+                    out = resp.content
+                except urlfetch.DownloadError, e:
+                    out = str(e)
+            
+            usernames = fetch_usernames(False)
+            if username in usernames:
+                m.username = username
+                m.put()
+                self.redirect('/success/%s?email' % hash)
             else:
-                m = Membership.all().filter('hash =', hash).get()
-                
-                if m.spreedly_token:
-                    try:
-                        resp = urlfetch.fetch('http://hackerdojo-domain.appspot.com/users', method='POST', payload=urllib.urlencode({
-                            'username': username,
-                            'password': password,
-                            'first_name': m.first_name,
-                            'last_name': m.last_name,
-                            'secret': keymaster.get('api-secret'),
-                        }), deadline=10)
-                        if 'try again'  in resp.content:
-                            self.redirect(self.request.path + "?message=There was a caching error, please try again.")
-                            return
-                    except urlfetch.DownloadError:
-                        pass
-                
-                usernames = fetch_usernames(False)
-                if username in usernames:
-                    m.username = username
-                    m.put()
-                    self.redirect('/success/%s?email' % hash)
-                else:
-                    mail.send_mail(sender=EMAIL_FROM,
-                        to="Jeff Lindsay <progrium@gmail.com>",
-                        subject="Error creating account",
-                        body=resp.content if m.spreedly_token else "Attempt to make user without paying: " + self.request.remote_addr)
-                    self.redirect(self.request.path + "?message=There was a problem creating your account. Please contact an admin.")
+                mail.send_mail(sender=EMAIL_FROM,
+                    to="Jeff Lindsay <progrium@gmail.com>",
+                    subject="Error creating account for %s" % username,
+                    body=out if m.spreedly_token else "Attempt to make user without paying: " + self.request.remote_addr)
+                self.redirect(self.request.path + "?message=There was a problem creating your account. Please contact an admin.")
             
 
 class SuccessHandler(webapp.RequestHandler):
@@ -231,6 +223,14 @@ class UpdateHandler(webapp.RequestHandler):
             member.put()
         self.response.out.write("ok")
             
+class LinkedHandler(webapp.RequestHandler):
+    def get(self):
+        self.response.out.write(simplejson.dumps([m.username for m in Membership.all().filter('username !=', None)]))
+
+class SuspendedHandler(webapp.RequestHandler):
+    def get(self):
+        self.response.out.write(simplejson.dumps([[m.fullname(), m.username] for m in Membership.all().filter('status =', 'suspended')]))
+
 class CleanupHandler(webapp.RequestHandler):
     def get(self):
         self.post()
@@ -250,14 +250,14 @@ class CleanupHandler(webapp.RequestHandler):
 def main():
     application = webapp.WSGIApplication([
         ('/', MainHandler),
+        ('/api/linked', LinkedHandler),
+        ('/api/suspended', SuspendedHandler),
         ('/cleanup', CleanupHandler),
         ('/account/(.+)', AccountHandler),
         ('/upgrade/needaccount', NeedAccountHandler),
         ('/success/(.+)', SuccessHandler),
         ('/update', UpdateHandler),
-        ('/key/(.+)', keymaster.Handler({
-            'api-secret': ('c94d981ca589581cd270439854f08679', '1w5q7v3h'),
-            })),], debug=True)
+        ], debug=True)
     wsgiref.handlers.CGIHandler().run(application)
 
 if __name__ == '__main__':
