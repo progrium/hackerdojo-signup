@@ -211,16 +211,17 @@ class UpdateHandler(webapp.RequestHandler):
         for id in subscriber_ids:
             subscriber = s.subscriber_details(sub_id=int(id))
             member = Membership.get_by_id(int(subscriber['customer-id']))
-            if member.status == 'paypal':
-                mail.send_mail(sender=EMAIL_FROM,
-                    to="PayPal <paypal@hackerdojo.com>",
-                    subject="Please cancel PayPal subscription for %s" % member.full_name(),
-                    body=member.email)
-            member.status = 'active' if subscriber['active'] == 'true' else 'suspended'
-            member.spreedly_token = subscriber['token']
-            member.plan = subscriber['feature-level'] or member.plan
-            member.email = subscriber['email']
-            member.put()
+            if member:
+                if member.status == 'paypal':
+                    mail.send_mail(sender=EMAIL_FROM,
+                        to="PayPal <paypal@hackerdojo.com>",
+                        subject="Please cancel PayPal subscription for %s" % member.full_name(),
+                        body=member.email)
+                member.status = 'active' if subscriber['active'] == 'true' else 'suspended'
+                member.spreedly_token = subscriber['token']
+                member.plan = subscriber['feature-level'] or member.plan
+                member.email = subscriber['email']
+                member.put()
         self.response.out.write("ok")
             
 class LinkedHandler(webapp.RequestHandler):
