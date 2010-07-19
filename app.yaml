@@ -14,5 +14,8 @@ handlers:
   static_dir: static
 - url: /remote_api
   script: $PYTHON_LIB/google/appengine/ext/remote_api/handler.py
+- url: /_km/.*
+  script: keymaster.py
+  login: admin
 - url: .*
   script: main.py
