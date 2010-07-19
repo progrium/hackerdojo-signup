@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+
+<h2>Self-Serve Key Assignment</h2>
+
+<p>This page lets you associate an RFID tag with your hackerdojo account.</p>
+
+<p>Simply grab an RFID tag from TODO:LOCATION_OF_TAGS and enter the numbers printed on it here.</p>
+
+<form method=post style="margin:1em; width:25em; padding:1em; background:#efe9fe; border:3px dashed #cab3fe; margin:0 auto; text-align:center">
+  <label for="key" style="font-size:22px">Key:</label> <input size=10 type=text name=rfid_tag value="" style="font-size:22px" />
+  <input type="submit" value="Save" style="font-size:22px" />
+  {% if bc %}
+    <p style="text-align:left"><label for="description">Reason for changing to a new RFID tag:</label></p>
+    <textarea rows="4" cols="80" style="width:100%" name="description"></textarea>
+  {% else %}
+    <input type="hidden" name="description" value="Initial assignment" />
+  {% endif %}
+</form>
+
+
+{% if bc %}
+  
+  <h3>RFID Tag Assignment History</h3>
+  
+  <style>
+  .log td {border-bottom:1px solid #ccc; border-right:1px solid #ccc; font-size:12px; padding:2px}
+  table.log {border-left:1px solid #ccc; border-top:1px solid #ccc; margin-top:0}
+  .log .header {font-weight:bold;}
+  h3 {margin-top:3em}
+  </style>
+  
+  <table class="log" width="100%" cellspacing="0" cellpadding="0" border="0">
+  <tr class="header">
+    <td>Timestamp</td>
+    <td>User</td>
+    <td>RFID ID</td>
+    <td>Description</td>
+  </tr>
+  {% for c in bc %}  
+    <tr>
+      <td>{{ c.created }}</td>
+      <td>{{ c.username }}</td>
+      <td>{{ c.rfid_tag }}</td>
+      <td>{{ c.description }}</td>
+    </tr>
+  {% endfor %}
+  </table>
+  {% endif %}
+  
+{% endblock %}
