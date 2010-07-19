@@ -33,7 +33,6 @@ else:
 
 is_prod = not is_dev
 
-
 def fetch_usernames(use_cache=True):
     usernames = memcache.get('usernames')
     if usernames and use_cache:
@@ -325,7 +324,26 @@ class KeyHandler(webapp.RequestHandler):
         error = "<p>That RFID ID seemed invalid. Hit back and try again.</p>"
         self.response.out.write(template.render('templates/error.html', locals()))
         return
-     
+
+class RFIDHandler(webapp.RequestHandler):
+    def get(self):
+        self.response.out.write(simplejson.dumps([ {"rfid_tag" : m.rfid_tag, "username" : m.username } for m in Membership.all().filter('rfid_tag !=', None).filter('status =', 'active')]))
+
+class ModifyHandler(webapp.RequestHandler):
+    def get(self):
+      Membership.all().filter('email =', user.email()).get()
+      if not user:
+          self.redirect(users.create_login_url('/modify'))
+          return
+      else:
+          account = Membership.all().filter('email =', user.email()).get()
+          if not account or not account.spreedly_token:
+            error = "<p>Sorry, your hackerdojo account does not appear to be linked to a Spreedly account.  Please contact <a href=\"mailto:treasurer@hackerdojo.com\">treasurer@hackerdojo.com</a> so they can manually update your account."
+            self.response.out.write(template.render('templates/error.html', locals()))
+            return
+          url = "https://spreedly.com/"+SPREEDLY_ACCOUNT+"/subscriber_accounts/"+account.spreedly_token
+          self.redirect(url)
+          
 class BadgeChange(db.Model):
     created = db.DateTimeProperty(auto_now_add=True)
     rfid_tag = db.StringProperty()    
@@ -335,10 +353,12 @@ class BadgeChange(db.Model):
 def main():
     application = webapp.WSGIApplication([
         ('/', MainHandler),
+        ('/api/rfid', RFIDHandler),
         ('/api/linked', LinkedHandler),
         ('/api/suspended', SuspendedHandler),
         ('/cleanup', CleanupHandler),
         ('/key', KeyHandler),
+        ('/modify', ModifyHandler),
         ('/account/(.+)', AccountHandler),
         ('/upgrade/needaccount', NeedAccountHandler),
         ('/success/(.+)', SuccessHandler),
