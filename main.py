@@ -181,7 +181,6 @@ class AccountHandler(webapp.RequestHandler):
                     subject="Error creating account for %s" % username,
                     body=out if m.spreedly_token else "Attempt to make user without paying: " + self.request.remote_addr)
                 self.redirect(self.request.path + "?message=There was a problem creating your account. Please contact an admin.")
-            
 
 class SuccessHandler(webapp.RequestHandler):
     def get(self, hash):
@@ -252,6 +251,23 @@ class SuspendedHandler(webapp.RequestHandler):
     def get(self):
         self.response.out.write(simplejson.dumps([[m.fullname(), m.username] for m in Membership.all().filter('status =', 'suspended')]))
 
+class AllHandler(webapp.RequestHandler):
+    def get(self):
+      user = users.get_current_user()
+      if not user:
+        self.redirect(users.create_login_url('/userlist'))
+      if users.is_current_user_admin():
+        signup_users = Membership.all().fetch(1000)
+        signup_usernames = [m.username for m in signup_users]
+        domain_usernames = fetch_usernames()
+        signup_usernames = set(signup_usernames) - set([None])
+        signup_usernames = [m.lower() for m in signup_usernames]
+        users_not_on_domain = set(signup_usernames) - set(domain_usernames)
+        users_not_on_signup = set(domain_usernames) - set(signup_usernames)
+        self.response.out.write(template.render('templates/users.html', locals()))
+      else:
+        self.response.out.write("Need admin access")
+      
 class CleanupHandler(webapp.RequestHandler):
     def get(self):
         self.post()
@@ -360,6 +376,7 @@ def main():
     application = webapp.WSGIApplication([
         ('/', MainHandler),
         ('/api/rfid', RFIDHandler),
+        ('/userlist', AllHandler),
         ('/api/linked', LinkedHandler),
         ('/api/suspended', SuspendedHandler),
         ('/cleanup', CleanupHandler),
