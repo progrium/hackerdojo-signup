@@ -15,7 +15,7 @@ import sys
 
 APP_NAME = 'hd-signup'
 EMAIL_FROM = "Dojo Signup <no-reply@%s.appspotmail.com>" % APP_NAME
-DAYS_FOR_KEY = 60
+DAYS_FOR_KEY = 0
 
 try:
     is_dev = os.environ['SERVER_SOFTWARE'].startswith('Dev')
@@ -275,9 +275,15 @@ class KeyHandler(webapp.RequestHandler):
           self.redirect(users.create_login_url('/key'))
           return
       else:
-          account = Membership.all().filter('email =', user.email()).get()
+          account = Membership.all().filter('username =', user.nickname()).get()
           if not account or not account.spreedly_token:
             error = "<p>It appears that you have an account on @hackerdojo.com, but you do not have a corresponding account in the signup application.</p><p>How to remedy:</p><ol><li>If you <b>are not</b> in the Spreedly system yet, <a href=\"/\">sign up</a> now.</li><li>If you <b>are</b> in Spreedly already, please contact <a href=\"mailto:signupops@hackerdojo.com?Subject=Spreedly+account+not+linked+to+hackerdojo+account\">signupops@hackerdojo.com</a>.</li></ol>"
+            error += "<pre>Nick: "+str(user.nickname())
+            error += "<pre>Email: "+str(user.email())
+            error += "<pre>Account: "+str(account)
+            if account:
+              error += "<pre>Token: "+str(account.spreedly_token)
+            
             self.response.out.write(template.render('templates/error.html', locals()))
             return
           if account.status != "active":
@@ -298,14 +304,14 @@ class KeyHandler(webapp.RequestHandler):
       if not user:
           self.redirect(users.create_login_url('/key'))
           return
-      account = Membership.all().filter('email =', user.email()).get()    
+      account = Membership.all().filter('username =', user.nickname()).get()
       if not account or not account.spreedly_token or account.status != "active":
             error = "<p>Error #1982, which should never happen."
             self.response.out.write(template.render('templates/error.html', locals()))
             return
       rfid_tag = self.request.get('rfid_tag').strip()
       description = self.request.get('description').strip()
-      if rfid_tag.isdigit():
+      if rfid_tag:
         if Membership.all().filter('rfid_tag =', rfid_tag).get():
           error = "<p>That RFID tag is in use by someone else.</p>"
           self.response.out.write(template.render('templates/error.html', locals()))
@@ -336,7 +342,7 @@ class ModifyHandler(webapp.RequestHandler):
           self.redirect(users.create_login_url('/modify'))
           return
       else:
-          account = Membership.all().filter('email =', user.email()).get()
+          account = Membership.all().filter('username =', user.nickname()).get()
           if not account or not account.spreedly_token:
             error = "<p>Sorry, your hackerdojo account does not appear to be linked to a Spreedly account.  Please contact <a href=\"mailto:treasurer@hackerdojo.com\">treasurer@hackerdojo.com</a> so they can manually update your account."
             self.response.out.write(template.render('templates/error.html', locals()))
