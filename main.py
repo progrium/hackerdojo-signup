@@ -349,7 +349,21 @@ class KeyHandler(webapp.RequestHandler):
 
 class RFIDHandler(webapp.RequestHandler):
     def get(self):
-        self.response.out.write(simplejson.dumps([ {"rfid_tag" : m.rfid_tag, "username" : m.username } for m in Membership.all().filter('rfid_tag !=', None).filter('status =', 'active')]))
+      if self.request.get('id'):
+        m = Membership.all().filter('rfid_tag ==', self.request.get('id')).filter('status =', 'active').get()
+        if self.request.get('callback'): # jsonp callback support
+          self.response.out.write(self.request.get('callback')+"(");
+        if m:
+          self.response.out.write(simplejson.dumps({"rfid_tag" : m.rfid_tag, "username" : m.username }))
+        else:
+          self.response.out.write(simplejson.dumps({}))
+        if self.request.get('callback'):
+          self.response.out.write(")");
+      else:
+        if self.request.get('maglock:key') == keymaster.get('maglock:key'):
+          self.response.out.write(simplejson.dumps([ {"rfid_tag" : m.rfid_tag, "username" : m.username } for m in Membership.all().filter('rfid_tag !=', None).filter('status =', 'active')]))
+        else:
+          self.response.out.write("Access denied")
 
 class ModifyHandler(webapp.RequestHandler):
     def get(self):
