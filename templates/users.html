@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+
+<h2>User List</h2>
+
+<style>
+.log td {border-bottom:1px solid #ccc; border-right:1px solid #ccc; font-size:12px; padding:2px}
+table.log {border-left:1px solid #ccc; border-top:1px solid #ccc; margin-top:0}
+.log .header {font-weight:bold;}
+h3 {margin-top:3em}
+.bad {background:#fdd}
+</style>
+
+<table class="log" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr class="header">
+  <td>Name</td>
+  <td>Username</td>
+  <td>Plan</td>
+  <td>Status</td>
+  <td>Spreedly</td>
+  <td>RFID</td>
+</tr>
+
+{% for u in signup_users %}  
+  <tr>
+    <td><a href="https://appengine.google.com/datastore/edit?app_id=hd-signup&key={{u.key}}">{{ u.first_name }} {{ u.last_name }}</a></td>
+    <td {% if not u.username%}class="bad"{% endif %}>{{ u.username }}</td>
+    <td>{{ u.plan }}</td>
+    <td {% if not u.status %}class="bad"{% endif %}>{{ u.status }}</td>
+    <td {% if not u.spreedly_token %}class="bad"{% endif %}>{% if u.spreedly_token %}Yes{% else %}No{% endif %}</td>
+    <td>{{ u.rfid_tag }}</td>
+  </tr>
+{% endfor %}
+</table>
+
+<h3>@Hackerdojo.com Domain users not found in Signup application</h3>
+
+{% for u in users_not_on_signup %}  
+{{ u }},  
+{% endfor %}  
+
+<h3>Signup users not found in hackerdojo domain</h3>
+
+{% for u in users_not_on_domain %}  
+{{ u }},  
+{% endfor %}  
+
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+
+<h2>Profile</h2>
+
+<style>
+label {font-weight:bold}
+</style>
+
+<table style="margin:0">
+
+<tr>
+  
+  <td>
+    <img src="{{ gravatar_url }}">
+  </td>
+  
+  <td>
+    <p><label>Name:</label> {{ account.first_name }} {{ account.last_name }}
+    <br><label>E-mail:</label> {{ email }}
+    <br><label>Status:</label> {{ account.status }}
+  </td>
+
+</tr>
+
+
+</table>
+
+<p>To change your thumbnail, go to <a href="http://en.gravatar.com/site/login/">Gravatar</a> and edit the thumbnail for <b>{{ email }}</b></p>
+
+<p><b>Coming soon:</b> Ability to edit your profile (lol).</p>
+
+  
+{% endblock %}

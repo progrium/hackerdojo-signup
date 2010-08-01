@@ -15,7 +15,7 @@ import sys
 
 APP_NAME = 'hd-signup'
 EMAIL_FROM = "Dojo Signup <no-reply@%s.appspotmail.com>" % APP_NAME
-DAYS_FOR_KEY = 0
+DAYS_FOR_KEY = 60
 
 try:
     is_dev = os.environ['SERVER_SOFTWARE'].startswith('Dev')
@@ -284,6 +284,18 @@ class CleanupHandler(webapp.RequestHandler):
                 subject="Recent almost members",
                 body='\n'.join(deleted_emails))
 
+class ProfileHandler(webapp.RequestHandler):
+    def get(self):
+      user = users.get_current_user()
+      if not user:
+          self.redirect(users.create_login_url('/profile'))
+          return
+      else:
+          account = Membership.all().filter('username =', user.nickname()).get()
+          email = account.username + "@hackerdojo.com"
+          gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest()          
+          self.response.out.write(template.render('templates/profile.html', locals()))
+
 class KeyHandler(webapp.RequestHandler):
     def get(self):
       user = users.get_current_user()
@@ -309,7 +321,7 @@ class KeyHandler(webapp.RequestHandler):
             return
           delta = datetime.utcnow() - account.created
           if delta.days < DAYS_FOR_KEY:
-            error = "<p>You have been a member for "+str(delta.days)+" days.  After "+str(DAYS_FOR_KEY)+" days you qualify for a key.  Check back in "+str(DAYS_FOR_KEY-delta.days)+" days!</p>";
+            error = "<p>You have been a member for "+str(delta.days)+" days.  After "+str(DAYS_FOR_KEY)+" days you qualify for a key.  Check back in "+str(DAYS_FOR_KEY-delta.days)+" days!</p><p>If you believe this message is in error, please contact <a href=\"mailto:signupops@hackerdojo.com?Subject=Membership+create+date+not+correct\">signupops@hackerdojo.com</a>.</p>";
             self.response.out.write(template.render('templates/error.html', locals()))
             return    
           bc = BadgeChange.all().filter('username =', account.username).fetch(100)
@@ -327,7 +339,7 @@ class KeyHandler(webapp.RequestHandler):
             return
       rfid_tag = self.request.get('rfid_tag').strip()
       description = self.request.get('description').strip()
-      if rfid_tag:
+      if rfid_tag.isdigit():
         if Membership.all().filter('rfid_tag =', rfid_tag).get():
           error = "<p>That RFID tag is in use by someone else.</p>"
           self.response.out.write(template.render('templates/error.html', locals()))
@@ -354,7 +366,9 @@ class RFIDHandler(webapp.RequestHandler):
         if self.request.get('callback'): # jsonp callback support
           self.response.out.write(self.request.get('callback')+"(");
         if m:
-          self.response.out.write(simplejson.dumps({"rfid_tag" : m.rfid_tag, "username" : m.username }))
+          email = m.username + "@hackerdojo.com"
+          gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest()
+          self.response.out.write(simplejson.dumps({"gravatar": gravatar_url,"status" : m.status, "name" : m.first_name + " " + m.last_name, "rfid_tag" : m.rfid_tag, "username" : m.username }))
         else:
           self.response.out.write(simplejson.dumps({}))
         if self.request.get('callback'):
@@ -394,6 +408,7 @@ def main():
         ('/api/linked', LinkedHandler),
         ('/api/suspended', SuspendedHandler),
         ('/cleanup', CleanupHandler),
+        ('/profile', ProfileHandler),
         ('/key', KeyHandler),
         ('/modify', ModifyHandler),
         ('/account/(.+)', AccountHandler),
