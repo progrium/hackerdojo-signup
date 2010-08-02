@@ -7,7 +7,7 @@
 
 <p>This page lets you associate an RFID tag with your hackerdojo account.</p>
 
-<p>Simply grab an RFID tag from TODO:LOCATION_OF_TAGS and enter the numbers printed on it here.</p>
+<p>Simply grab an RFID tag from the drawer in the electonics lab and enter the numbers printed on it here.</p>
 
 <form method=post style="margin:1em; width:25em; padding:1em; background:#efe9fe; border:3px dashed #cab3fe; margin:0 auto; text-align:center">
   <label for="key" style="font-size:22px">Key:</label> <input size=10 type=text name=rfid_tag value="" style="font-size:22px" />
@@ -48,6 +48,22 @@
     </tr>
   {% endfor %}
   </table>
-  {% endif %}
+
+{% else %}
+
+
+<img style="margin-top:5em"src="http://wiki.hackerdojo.com/f/elab-rfid.jpg" width="533" height="400" border="1" />
+
+<h5 style="margin-top:.5em">Figure 1: Location of RFID tags in Electroics Lab</h5>
+
+<img style="margin-top:1em" src="http://wiki.hackerdojo.com/f/rfid-numbers.jpg" width="533" height="400" border="1" />
+
+<h5 style="margin-top:.5em; margin-bottom:3em">Figure 2: Those Numbers You Be Typing</h5>
+
+
+
+
+{% endif %}
+  
   
 {% endblock %}
