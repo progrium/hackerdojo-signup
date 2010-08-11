@@ -87,6 +87,8 @@ class MainHandler(webapp.RequestHandler):
             if existing_member:
                 if existing_member.status in [None, 'paypal']:
                     existing_member.delete()
+                elif existing_member.status == 'suspended':
+                    pass # just allow creating another member for now. for records, better than deleting old one
                 else:
                     self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod, 'plan': plan, 'message': "You're already in our system!"}))
                     return
