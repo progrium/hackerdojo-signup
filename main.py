@@ -253,6 +253,14 @@ class SuspendedHandler(webapp.RequestHandler):
     def get(self):
         self.response.out.write(simplejson.dumps([[m.fullname(), m.username] for m in Membership.all().filter('status =', 'suspended')]))
 
+class MemberListHandler(webapp.RequestHandler):
+    def get(self):
+      user = users.get_current_user()
+      if not user:
+        self.redirect(users.create_login_url('/memberlist'))
+      signup_users = Membership.all().order("last_name").fetch(1000);
+      self.response.out.write(template.render('templates/memberlist.html', locals()))
+		
 class AllHandler(webapp.RequestHandler):
     def get(self):
       user = users.get_current_user()
@@ -416,6 +424,7 @@ def main():
         ('/account/(.+)', AccountHandler),
         ('/upgrade/needaccount', NeedAccountHandler),
         ('/success/(.+)', SuccessHandler),
+        ('/memberlist', MemberListHandler),
         ('/update', UpdateHandler),
         ], debug=True)
     wsgiref.handlers.CGIHandler().run(application)
