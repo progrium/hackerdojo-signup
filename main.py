@@ -15,7 +15,7 @@ import sys
 
 APP_NAME = 'hd-signup'
 EMAIL_FROM = "Dojo Signup <no-reply@%s.appspotmail.com>" % APP_NAME
-DAYS_FOR_KEY = 60
+DAYS_FOR_KEY = 30
 
 try:
     is_dev = os.environ['SERVER_SOFTWARE'].startswith('Dev')
@@ -189,6 +189,7 @@ class SuccessHandler(webapp.RequestHandler):
         member = Membership.all().filter('hash =', hash).get()
         if member:
             if self.request.query_string == 'email':
+                spreedly_url = member.spreedly_url()
                 mail.send_mail(sender=EMAIL_FROM,
                     to="%s <%s>" % (member.full_name(), member.email),
                     subject="Welcome to Hacker Dojo, %s!" % member.first_name,
