@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<h2>Preferences</h2>
+
+
+<form method=post style="margin:1em; width:25em; padding:1em; background:#efe9fe; border:3px dashed #cab3fe; margin:0 auto; ">
+  <label for="auto" style="font-size:22px">Auto sign-in:</label>
+  <br><br><input {% ifequal auto_signin "4" %}checked{% endifequal %} type="radio" name="auto" value="4" /> Ask me every time
+  <br><input {% ifequal auto_signin "1" %}checked{% endifequal %} type="radio" name="auto" value="1" /> Anonymous
+  <br><input {% ifequal auto_signin "2" %}checked{% endifequal %} type="radio" name="auto" value="2" /> Member
+  <br><input {% ifequal auto_signin "3" %}checked{% endifequal %} type="radio" name="auto" value="3" /> Staff
+  <br><br><input type="submit" value="Save" style="font-size:22px" />
+</form>
+  
+{% endblock %}

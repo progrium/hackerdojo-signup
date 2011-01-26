@@ -55,6 +55,7 @@ class Membership(db.Model):
     referrer  = db.StringProperty()
     username = db.StringProperty()
     rfid_tag = db.StringProperty()
+    auto_signin = db.StringProperty()
     
     spreedly_token = db.StringProperty()
     
@@ -307,6 +308,43 @@ class ProfileHandler(webapp.RequestHandler):
           gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest()          
           self.response.out.write(template.render('templates/profile.html', locals()))
 
+class PrefHandler(webapp.RequestHandler):
+   def get(self):
+      user = users.get_current_user()
+      if not user:
+          self.redirect(users.create_login_url('/key'))
+          return
+      else:
+          account = Membership.all().filter('username =', user.nickname()).get()
+          if not account:
+            error = "<p>Error - couldn't find your account.</p>"
+            error += "<pre>Nick: "+str(user.nickname())
+            error += "<pre>Email: "+str(user.email())
+            error += "<pre>Account: "+str(account)
+            if account:
+              error += "<pre>Token: "+str(account.spreedly_token)
+            self.response.out.write(template.render('templates/error.html', locals()))
+            return
+          auto_signin = account.auto_signin
+          self.response.out.write(template.render('templates/pref.html', locals()))
+
+   def post(self):
+      user = users.get_current_user()
+      if not user:
+          self.redirect(users.create_login_url('/key'))
+          return
+      account = Membership.all().filter('username =', user.nickname()).get()
+      if not account:
+            error = "<p>Error #1983, which should never happen."
+            self.response.out.write(template.render('templates/error.html', locals()))
+            return
+      auto_signin = self.request.get('auto').strip()
+      account.auto_signin = auto_signin
+      account.put()
+      self.response.out.write(template.render('templates/prefsaved.html', locals()))
+ 
+            
+
 class KeyHandler(webapp.RequestHandler):
     def get(self):
       user = users.get_current_user()
@@ -379,7 +417,7 @@ class RFIDHandler(webapp.RequestHandler):
         if m:
           email = m.username + "@hackerdojo.com"
           gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest()
-          self.response.out.write(simplejson.dumps({"gravatar": gravatar_url,"status" : m.status, "name" : m.first_name + " " + m.last_name, "rfid_tag" : m.rfid_tag, "username" : m.username }))
+          self.response.out.write(simplejson.dumps({"gravatar": gravatar_url,"auto_signin":m.auto_signin, "status" : m.status, "name" : m.first_name + " " + m.last_name, "rfid_tag" : m.rfid_tag, "username" : m.username }))
         else:
           self.response.out.write(simplejson.dumps({}))
         if self.request.get('callback'):
@@ -421,6 +459,7 @@ def main():
         ('/cleanup', CleanupHandler),
         ('/profile', ProfileHandler),
         ('/key', KeyHandler),
+        ('/pref', PrefHandler),
         ('/modify', ModifyHandler),
         ('/account/(.+)', AccountHandler),
         ('/upgrade/needaccount', NeedAccountHandler),
