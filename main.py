@@ -312,7 +312,7 @@ class PrefHandler(webapp.RequestHandler):
    def get(self):
       user = users.get_current_user()
       if not user:
-          self.redirect(users.create_login_url('/key'))
+          self.redirect(users.create_login_url('/pref'))
           return
       else:
           account = Membership.all().filter('username =', user.nickname()).get()
@@ -331,7 +331,7 @@ class PrefHandler(webapp.RequestHandler):
    def post(self):
       user = users.get_current_user()
       if not user:
-          self.redirect(users.create_login_url('/key'))
+          self.redirect(users.create_login_url('/pref'))
           return
       account = Membership.all().filter('username =', user.nickname()).get()
       if not account:
