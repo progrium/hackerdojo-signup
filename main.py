@@ -86,7 +86,7 @@ class MainHandler(webapp.RequestHandler):
     def post(self):
         first_name = self.request.get('first_name')
         last_name = self.request.get('last_name')
-        email = self.request.get('email')
+        email = self.request.get('email').lower()
         plan = self.request.get('plan', 'full')
         
         if not first_name or not last_name or not email:
@@ -263,7 +263,7 @@ class NeedAccountHandler(webapp.RequestHandler):
         self.response.out.write(template.render('templates/needaccount.html', locals()))
     
     def post(self):
-        email = self.request.get('email')
+        email = self.request.get('email').lower()
         if not email:
             self.redirect(self.request.path)
         else:
