@@ -1,10 +1,14 @@
-import urllib, xml.dom.minidom
+import urllib2, xml.dom.minidom, base64
 
 __version__ = '0.1'
 
 SITE_NAME = 'your-site'
 SPREEDLY_BASE_URL = 'https://spreedly.com/api/v4/%(site)s/'
 SPREEDLY_TOKEN = 'your-token'
+
+def basic_auth(user, password):
+    return "Basic %s" % base64.b64encode('%s:%s' % (user, password))[:-1]
+
 
 def remove_whitespace_nodes(node, unlink=True):
     remove_list = set()
@@ -24,16 +28,6 @@ def get_code(response):
         return response.code # py 2.6
     
     return int(response.headers['status'][0:3])
-
-class UAOpener(urllib.FancyURLopener):
-    def __init__(self, token, *args, **kwargs):
-        self.token = token
-        urllib.FancyURLopener.__init__(self, *args, **kwargs)
-
-    def prompt_user_passwd(self, host, realm):
-        return (self.token, 'X')
-
-    version = 'pyspreedly/%s' % __version__
 
 class XMLReply(object):
     def __init__(self, payload):
@@ -102,9 +96,18 @@ class Spreedly(object):
     def url(self, rel_url):
         return self.base_url % { 'site': self.site }+rel_url
         
+        
     def request(self, url, data=None):
-        opener = UAOpener(self.token)
+        
+        auth_handler = urllib2.HTTPBasicAuthHandler()
+        auth_handler.add_password(realm='Web Password',
+          uri='https://spreedly.com/', user=self.token,
+          passwd='X')
+        opener = urllib2.build_opener(auth_handler)
+        urllib2.install_opener(opener)
+        
         return self.to_reply(opener.open(self.url(url), data))
+
         
     def to_reply(self, response):
         if not get_code(response) == 200:

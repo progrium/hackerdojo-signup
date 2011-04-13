@@ -9,14 +9,17 @@ We've sent you a link to create your account. Check your inbox!
 </h4>
 <span style="color: red;">{{ message }}</span>
 <div>
+
+<!--
 	<div style="width: 45%; background: #fee; border: 2px solid #db002a; float: left; margin: 5px; padding: 10px;">
 		<h3>I signed up with PayPal.</h3>
 		<p style="font-size:smaller;">You need to upgrade to our new billing system by signing up on this site. Your PayPal subscription will be canceled once you switch.</p>
 		<input type="submit" value="Continue here" style="font-size: larger;" onclick="window.location.href='/?paypal=1'"/>
 	</div>
-	
-	<div style="width: 45%; background: #fee; border: 2px solid #db002a; float: right; margin: 5px; padding: 10px;">
-		<h3>I signed up with Spreedly.</h3>
+
+-->	
+	<div style="width: 45%; background: #fee; border: 2px solid #db002a;  margin: 5px; margin-left:25%; padding: 10px;">
+<!--		<h3>I signed up with Spreedly.</h3> -->
 		<p style="font-size: smaller;">Tell us the email address you used:</p>
 		<form action="{{self.request.path}}" method="post" style="margin:0px;">
 		<input type="text" name="email" style="font-size: larger;"/><br />
