@@ -2,8 +2,8 @@
 {% block content %}
 <h4>
   <span class="step inactive"><span>1</span> Member Info &rarr; </span>
-  <span class="step inactive"><span>2</span> Billing Info &rarr; </span>
-	<span class="step"><span>3</span> Create Account &rarr; </span>
+  <span class="step"><span>2</span> Create Account &rarr; </span>
+  <span class="step inactive"><span>3</span> Billing Info &rarr; </span>
   <span class="step inactive"><span>4</span> Done!</span>
 </h4>
 <div style="margin-left: 50px; padding-top: 10px;">
@@ -15,10 +15,9 @@
 	  <tr><td class="label">Confirm:</td><td><input type="password" name="password_confirm" /></td></tr>
 	</table>
 	<div style="font-size: smaller; margin-left: 216px;">
-	 	<input type="submit" value="Finish &rarr;" />
+	 	<input type="submit" value="Next step &rarr;" style="font-size: large; margin-top: 25px;" /><br />
+    <span style="font-size: 11px">You will be taken to a secure page<br /> at <a href="http://spreedly.com/">Spreedly</a> for payment.</span>
 	<br />
-	<br />
-	<a href="{{ login_url }}">Already have a user account?</a>
 	</div>
 
 

@@ -2,7 +2,7 @@ import wsgiref.handlers
 import datetime, time, hashlib, urllib, urllib2, re, os
 from google.appengine.ext import db
 from google.appengine.ext import webapp
-from google.appengine.api import urlfetch, mail, memcache, users
+from google.appengine.api import urlfetch, mail, memcache, users, taskqueue
 from google.appengine.ext.webapp import template
 from django.utils import simplejson
 from pprint import pprint
@@ -12,7 +12,6 @@ import spreedly
 import keymaster
 import base64
 import sys
-import re
 
 APP_NAME = 'hd-signup'
 EMAIL_FROM = "Dojo Signup <no-reply@%s.appspotmail.com>" % APP_NAME
@@ -68,6 +67,14 @@ class Membership(db.Model):
     
     def spreedly_url(self):
         return "https://spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, self.spreedly_token)
+    
+    @classmethod
+    def get_by_email(cls, email):
+        return cls.all().filter('email =', email).get()
+    
+    @classmethod
+    def get_by_hash(cls, hash):
+        return cls.all().filter('hash =', hash).get()
 
 class MainHandler(webapp.RequestHandler):
     def get(self):
@@ -83,73 +90,38 @@ class MainHandler(webapp.RequestHandler):
         plan = self.request.get('plan', 'full')
         
         if not first_name or not last_name or not email:
-            self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod, 'plan': plan, 'message': "Sorry, we need all three fields."}))
+            self.response.out.write(template.render('templates/main.html', {
+                'is_prod': is_prod, 'plan': plan, 'message': "Sorry, we need all three fields."}))
         else:
-            existing_member = Membership.all().filter('email =', email).get()
-            if existing_member:
-                if existing_member.status in [None, 'paypal']:
-                    existing_member.delete()
-                elif existing_member.status == 'suspended':
-                    pass # just allow creating another member for now. for records, better than deleting old one
-                else:
-                    self.response.out.write(template.render('templates/main.html', {'is_prod': is_prod, 'plan': plan, 'message': "You're already in our system!"}))
-                    return
-            m = Membership(first_name=first_name, last_name=last_name, email=email, plan=plan)
+            existing_member = Membership.get_by_email(email)
+            if existing_member and existing_member.status in [None, 'paypal']:
+                existing_member.delete()
+            
+            membership = Membership(
+                first_name=first_name, last_name=last_name, email=email, plan=plan)
             if self.request.get('paypal') == '1':
-                m.status = 'paypal'
-            m.hash = hashlib.md5(m.email).hexdigest()
-            m.referrer = self.request.get('referrer')
-            m.put()
-            id = str(m.key().id())
-            username = re.compile(r'[^\w-]').sub('', "%s-%s-%s" % (m.first_name.lower(), m.last_name.lower(), id))
-            query_str = urllib.urlencode({'first_name': m.first_name, 'last_name': m.last_name, 'email': m.email, 'return_url': 'http://%s/account/%s' % (self.request.host, m.hash)})
-
-            if "maker00000" in m.referrer.lower():
-              key = SPREEDLY_APIKEY
-              encoded = base64.b64encode( key+':X')
-              authstr = "Basic "+encoded
-              mheaders = {'Authorization':authstr,'Content-Type':'application/xml'}
-              # Create subscriber
-              data = "<subscriber><customer-id>%s</customer-id><email>%s</email></subscriber>" % (id,email)
-              resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers.xml" % (SPREEDLY_ACCOUNT), method='POST',  payload=data, headers = mheaders, deadline=10)
-              # Credit
-              data = "<credit><amount>30.00</amount></credit>"
-              resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers/%s/credits.xml" % (SPREEDLY_ACCOUNT, id), method='POST',  payload=data, headers = mheaders, deadline=10)
-
-                        
-            self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % (SPREEDLY_ACCOUNT, id, PLAN_IDS[m.plan], username, query_str))
+                membership.status = 'paypal'
+            membership.hash = hashlib.md5(membership.email).hexdigest()
+            membership.referrer = self.request.get('referrer')
+            membership.put()
+            
+            self.redirect('/account/%s' % membership.hash)
 
 class AccountHandler(webapp.RequestHandler):
     def get(self, hash):
-        m = Membership.all().filter('hash =', hash).get()
-        if m.username:
-            self.redirect('/success/%s' % hash)
-        else:
-            s = spreedly.Spreedly(SPREEDLY_ACCOUNT, token=SPREEDLY_APIKEY)
-            valid_acct = False
-            try:
-                subscriber = s.subscriber_details(sub_id=int(m.key().id()))
-                valid_acct = subscriber['active'] == 'true'
-            except spreedly.SpreedlyResponseError:
-                pass
-            if valid_acct:
-                user = users.get_current_user()
-                if user:
-                    m.username = user.nickname().split('@')[0]
-                    m.put()
-                    self.redirect(users.create_logout_url('/success/%s' % hash))
-                else:
-                    message = self.request.get('message')
-                    p = re.compile(r'[^\w]')
-                    username = '.'.join([p.sub('', m.first_name), p.sub('', m.last_name)]).lower()
-                    if username in fetch_usernames():
-                        username = m.email.split('@')[0]
-                    if self.request.get('u'):
-                        pick_username = True
-                    login_url = users.create_login_url(self.request.path)
-                    self.response.out.write(template.render('templates/account.html', locals()))
-            else:
-                self.redirect("/")
+        membership = Membership.get_by_hash(hash)
+        
+        first_part = re.compile(r'[^\w]').sub('', membership.first_name.split(' ')[0]) # First word of first name
+        last_part = re.compile(r'[^\w]').sub('', membership.last_name)
+        if len(first_part)+len(last_part) >= 15:
+            last_part = last_part[0] # Just last initial
+        username = '.'.join([first_part, last_part]).lower()
+        if username in fetch_usernames():
+            username = membership.email.split('@')[0].lower()
+        if self.request.get('u'):
+            pick_username = True
+        message = self.request.get('message')
+        self.response.out.write(template.render('templates/account.html', locals()))
     
     def post(self, hash):
         username = self.request.get('username')
@@ -159,32 +131,79 @@ class AccountHandler(webapp.RequestHandler):
         elif len(password) < 6:
             self.redirect(self.request.path + "?message=Password must be 6 characters or longer")
         else:
-            m = Membership.all().filter('hash =', hash).get()
+            membership = Membership.get_by_hash(hash)
+            membership.put()
             
-            if m and m.spreedly_token:
-                try:
-                    resp = urlfetch.fetch('http://domain.hackerdojo.com/users', method='POST', payload=urllib.urlencode({
-                        'username': username,
-                        'password': password,
-                        'first_name': m.first_name,
-                        'last_name': m.last_name,
-                        'secret': keymaster.get('api@hackerdojo.com'),
-                    }), deadline=10)
-                    out = resp.content
-                except urlfetch.DownloadError, e:
-                    out = str(e)
+            # Yes, storing their username and password temporarily so we can make their account later
+            memcache.set(hashlib.sha1(membership.hash+SPREEDLY_APIKEY).hexdigest(), 
+                '%s:%s' % (username, password), time=3600)
             
-            usernames = fetch_usernames(False)
-            if username in usernames:
-                m.username = username
-                m.put()
-                self.redirect('/success/%s?email' % hash)
+            customer_id = membership.key().id()
+
+            # This code is weird...
+            if "maker00000" in membership.referrer.lower():
+                headers = {'Authorization': "Basic %s" % base64.b64encode('%s:X' % SPREEDLY_APIKEY),
+                    'Content-Type':'application/xml'}
+                # Create subscriber
+                data = "<subscriber><customer-id>%s</customer-id><email>%s</email></subscriber>" % (customer_id, membership.email)
+                resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers.xml" % (SPREEDLY_ACCOUNT), 
+                        method='POST', payload=data, headers = headers, deadline=5)
+                # Credit
+                data = "<credit><amount>30.00</amount></credit>"
+                resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers/%s/credits.xml" % (SPREEDLY_ACCOUNT, customer_id), 
+                        method='POST', payload=data, headers=headers, deadline=5)
+            
+            query_str = urllib.urlencode({'first_name': membership.first_name, 'last_name': membership.last_name, 
+                'email': membership.email, 'return_url': 'http://%s/success/%s' % (self.request.host, membership.hash)})
+            self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % 
+                (SPREEDLY_ACCOUNT, customer_id, PLAN_IDS[membership.plan], username, query_str))
+            
+            
+class CreateUserTask(webapp.RequestHandler):
+    def post(self):
+        def fail(what, details):
+            mail.send_mail(sender=EMAIL_FROM,
+                to="Internal Dev <internal-dev@hackerdojo.com>",
+                subject="[hd-signup] CreateUserTask failure",
+                body=details)
+        def retry(countdown=None):
+            retries = int(self.request.get('retries', 0)) + 1
+            if retries <= 5:
+                taskqueue.add(url='/tasks/create_user', method='POST', countdown=countdown,
+                    params={'hash': self.request.get('hash'), 'retries': retries})
             else:
-                mail.send_mail(sender=EMAIL_FROM,
-                    to="Jeff Lindsay <progrium@gmail.com>",
-                    subject="Error creating account for %s" % username,
-                    body=out if m.spreedly_token else "Attempt to make user without paying: " + self.request.remote_addr)
-                self.redirect(self.request.path + "?message=There was a problem creating your account. Please contact an admin.")
+                fail("Too many retries")
+        
+        membership = Membership.get_by_hash(self.request.get('hash'))
+        if membership is None or membership.username:
+            return
+        if not membership.spreedly_token:
+            return retry(300)
+            
+        try:
+            username, password = memcache.get(hashlib.sha1(membership.hash+SPREEDLY_APIKEY).hexdigest()).split(':')
+        except (AttributeError, ValueError):
+            return fail("Account information expired")
+            
+        try:
+            resp = urlfetch.fetch('http://domain.hackerdojo.com/users', method='POST', payload=urllib.urlencode({
+                'username': username,
+                'password': password,
+                'first_name': membership.first_name,
+                'last_name': membership.last_name,
+                'secret': keymaster.get('api@hackerdojo.com'),
+            }), deadline=10)
+        except urlfetch.DownloadError, e:
+            return retry()
+        except Exception, e:
+            return fail(e)
+        
+        usernames = fetch_usernames(False)
+        if username in usernames:
+            membership.username = username
+            membership.put()
+        else:
+            return retry()
 
 class SuccessHandler(webapp.RequestHandler):
     def get(self, hash):
@@ -241,6 +260,8 @@ class UpdateHandler(webapp.RequestHandler):
                         subject="Please cancel PayPal subscription for %s" % member.full_name(),
                         body=member.email)
                 member.status = 'active' if subscriber['active'] == 'true' else 'suspended'
+                if member.status == 'active' and not member.username:
+                    taskqueue.add(url='/tasks/create_user', method='POST', params={'hash': member.hash})
                 member.spreedly_token = subscriber['token']
                 member.plan = subscriber['feature-level'] or member.plan
                 member.email = subscriber['email']
@@ -467,6 +488,7 @@ def main():
         ('/success/(.+)', SuccessHandler),
         ('/memberlist', MemberListHandler),
         ('/update', UpdateHandler),
+        ('/tasks/create_user', CreateUserTask),
         ], debug=True)
     wsgiref.handlers.CGIHandler().run(application)
 
