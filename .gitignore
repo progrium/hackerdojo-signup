@@ -1,4 +1,3 @@
-index.yaml
 keys.py
 *.pyc
 **/*.pyc
