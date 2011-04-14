@@ -135,8 +135,12 @@ class MainHandler(webapp.RequestHandler):
                 membership.referrer = self.request.get('referrer')
                 membership.put()
             
-            self.redirect('/account/%s' % membership.hash)
-
+            # if there is a membership, redirect here
+            if membership.status != "active":
+              self.redirect('/account/%s' % membership.hash)
+            else:
+              self.redirect("https://www.spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, membership.spreedly_token))
+            
 class AccountHandler(webapp.RequestHandler):
     def get(self, hash):
         membership = Membership.get_by_hash(hash)
@@ -187,12 +191,9 @@ class AccountHandler(webapp.RequestHandler):
                 'email': membership.email, 'return_url': 'http://%s/success/%s' % (self.request.host, membership.hash)})
             # check if they are active already since we didn't create a new member above
             # apparently the URL will be different
-            if membership.status != "active":
-              self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % 
+            self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % 
                 (SPREEDLY_ACCOUNT, customer_id, PLAN_IDS[membership.plan], username, query_str))
-            else:
-              self.redirect("https://www.spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, membership.spreedly_token))
-            
+
             
 class CreateUserTask(webapp.RequestHandler):
     def post(self):
