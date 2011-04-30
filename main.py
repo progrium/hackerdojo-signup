@@ -13,9 +13,19 @@ import keymaster
 import base64
 import sys
 
+ORG_NAME = 'Hacker Dojo'
 APP_NAME = 'hd-signup'
 EMAIL_FROM = "Dojo Signup <no-reply@%s.appspotmail.com>" % APP_NAME
 DAYS_FOR_KEY = 30
+INTERNAL_DEV_EMAIL = "Internal Dev <internal-dev@hackerdojo.com>"
+DOMAIN_HOST = 'domain.hackerdojo.com'
+DOMAIN_USER = 'api@hackerdojo.com'
+SUCCESS_HTML_URL = 'http://hackerdojo.pbworks.com/api_v2/op/GetPage/page/SubscriptionSuccess/_type/html'
+PAYPAL_EMAIL = 'PayPal <paypal@hackerdojo.com>'
+APPS_DOMAIN = 'hackerdojo.com'
+SIGNUP_HELP_EMAIL = 'signupops@hackerdojo.com'
+TREASURER_EMAIL = 'treasurer@hackerdojo.com'
+GOOGLE_ANALYTICS_ID = 'UA-11332872-2'
 
 try:
     is_dev = os.environ['SERVER_SOFTWARE'].startswith('Dev')
@@ -38,12 +48,24 @@ def fetch_usernames(use_cache=True):
     if usernames and use_cache:
         return usernames
     else:
-        resp = urlfetch.fetch('http://domain.hackerdojo.com/users', deadline=10)
+        resp = urlfetch.fetch('http://%s/users' % DOMAIN_HOST, deadline=10)
         if resp.status_code == 200:
             usernames = [m.lower() for m in simplejson.loads(resp.content)]
             if not memcache.set('usernames', usernames, 3600*24):
                 logging.error("Memcache set failed.")
             return usernames
+
+def render(path, local_vars):
+    template_vars = {'is_prod': is_prod, 'org_name': ORG_NAME, 'analytics_id': GOOGLE_ANALYTICS_ID, 'domain': APPS_DOMAIN}
+    template_vars.update(local_vars)
+    return template.render(path, template_vars)
+    
+
+class BadgeChange(db.Model):
+    created = db.DateTimeProperty(auto_now_add=True)
+    rfid_tag = db.StringProperty()    
+    username = db.StringProperty()
+    description = db.StringProperty()
 
 class Membership(db.Model):
     hash = db.StringProperty()
@@ -78,8 +100,7 @@ class Membership(db.Model):
 
 class MainHandler(webapp.RequestHandler):
     def get(self):
-        self.response.out.write(template.render('templates/main.html', {
-            'is_prod': is_prod, 
+        self.response.out.write(render('templates/main.html', {
             'plan': self.request.get('plan', 'full'),
             'paypal': self.request.get('paypal')}))
     
@@ -90,8 +111,8 @@ class MainHandler(webapp.RequestHandler):
         plan = self.request.get('plan', 'full')
         
         if not first_name or not last_name or not email:
-            self.response.out.write(template.render('templates/main.html', {
-                'is_prod': is_prod, 'plan': plan, 'message': "Sorry, we need all three fields."}))
+            self.response.out.write(render('templates/main.html', {
+                'plan': plan, 'message': "Sorry, we need all three fields."}))
         else:
             existing_member = Membership.get_by_email(email)
             if existing_member and existing_member.status in [None, 'paypal']:
@@ -121,7 +142,7 @@ class AccountHandler(webapp.RequestHandler):
         if self.request.get('u'):
             pick_username = True
         message = self.request.get('message')
-        self.response.out.write(template.render('templates/account.html', locals()))
+        self.response.out.write(render('templates/account.html', locals()))
     
     def post(self, hash):
         username = self.request.get('username')
@@ -163,8 +184,8 @@ class CreateUserTask(webapp.RequestHandler):
     def post(self):
         def fail(what, details):
             mail.send_mail(sender=EMAIL_FROM,
-                to="Internal Dev <internal-dev@hackerdojo.com>",
-                subject="[hd-signup] CreateUserTask failure",
+                to=INTERNAL_DEV_EMAIL,
+                subject="[%s] CreateUserTask failure" % APP_NAME,
                 body=details)
         def retry(countdown=None):
             retries = int(self.request.get('retries', 0)) + 1
@@ -186,12 +207,12 @@ class CreateUserTask(webapp.RequestHandler):
             return fail("Account information expired")
             
         try:
-            resp = urlfetch.fetch('http://domain.hackerdojo.com/users', method='POST', payload=urllib.urlencode({
+            resp = urlfetch.fetch('http://%s/users' % DOMAIN_HOST, method='POST', payload=urllib.urlencode({
                 'username': username,
                 'password': password,
                 'first_name': membership.first_name,
                 'last_name': membership.last_name,
-                'secret': keymaster.get('api@hackerdojo.com'),
+                'secret': keymaster.get(DOMAIN_USER),
             }), deadline=10)
         except urlfetch.DownloadError, e:
             return retry()
@@ -207,25 +228,25 @@ class CreateUserTask(webapp.RequestHandler):
 
 class SuccessHandler(webapp.RequestHandler):
     def get(self, hash):
-        member = Membership.all().filter('hash =', hash).get()
+        member = Membership.get_by_hash(hash)
         if member:
             if self.request.query_string == 'email':
                 spreedly_url = member.spreedly_url()
                 mail.send_mail(sender=EMAIL_FROM,
                     to="%s <%s>" % (member.full_name(), member.email),
                     subject="Welcome to Hacker Dojo, %s!" % member.first_name,
-                    body=template.render('templates/welcome.txt', locals()))
+                    body=render('templates/welcome.txt', locals()))
                 self.redirect(self.request.path)
             else:
-                success_html = urlfetch.fetch("http://hackerdojo.pbworks.com/api_v2/op/GetPage/page/SubscriptionSuccess/_type/html").content
+                success_html = urlfetch.fetch(SUCCESS_HTML_URL).content
                 success_html = success_html.replace('joining!', 'joining, %s!' % member.first_name)
                 is_prod = not is_dev
-                self.response.out.write(template.render('templates/success.html', locals()))
+                self.response.out.write(render('templates/success.html', locals()))
 
 class NeedAccountHandler(webapp.RequestHandler):
     def get(self):
         message = self.request.get('message')
-        self.response.out.write(template.render('templates/needaccount.html', locals()))
+        self.response.out.write(render('templates/needaccount.html', locals()))
     
     def post(self):
         email = self.request.get('email')
@@ -241,7 +262,7 @@ class NeedAccountHandler(webapp.RequestHandler):
                     subject="Create your Hacker Dojo account",
                     body="""Hello,\n\nHere's a link to create your Hacker Dojo account:\n\nhttp://%s/account/%s""" % (self.request.host, member.hash))
                 sent = True
-                self.response.out.write(template.render('templates/needaccount.html', locals()))
+                self.response.out.write(render('templates/needaccount.html', locals()))
 
 class UpdateHandler(webapp.RequestHandler):
     def get(self):
@@ -256,7 +277,7 @@ class UpdateHandler(webapp.RequestHandler):
             if member:
                 if member.status == 'paypal':
                     mail.send_mail(sender=EMAIL_FROM,
-                        to="PayPal <paypal@hackerdojo.com>",
+                        to=PAYPAL_EMAIL,
                         subject="Please cancel PayPal subscription for %s" % member.full_name(),
                         body=member.email)
                 member.status = 'active' if subscriber['active'] == 'true' else 'suspended'
@@ -283,7 +304,7 @@ class MemberListHandler(webapp.RequestHandler):
       if not user:
         self.redirect(users.create_login_url('/memberlist'))
       signup_users = Membership.all().order("last_name").fetch(1000);
-      self.response.out.write(template.render('templates/memberlist.html', locals()))
+      self.response.out.write(render('templates/memberlist.html', locals()))
 		
 class AllHandler(webapp.RequestHandler):
     def get(self):
@@ -298,7 +319,7 @@ class AllHandler(webapp.RequestHandler):
         signup_usernames = [m.lower() for m in signup_usernames]
         users_not_on_domain = set(signup_usernames) - set(domain_usernames)
         users_not_on_signup = set(domain_usernames) - set(signup_usernames)
-        self.response.out.write(template.render('templates/users.html', locals()))
+        self.response.out.write(render('templates/users.html', locals()))
       else:
         self.response.out.write("Need admin access")
       
@@ -326,9 +347,9 @@ class ProfileHandler(webapp.RequestHandler):
           return
       else:
           account = Membership.all().filter('username =', user.nickname()).get()
-          email = account.username + "@hackerdojo.com"
+          email = '%s@%s' % (account.username, APPS_DOMAIN)
           gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest()          
-          self.response.out.write(template.render('templates/profile.html', locals()))
+          self.response.out.write(render('templates/profile.html', locals()))
 
 class PrefHandler(webapp.RequestHandler):
    def get(self):
@@ -345,10 +366,10 @@ class PrefHandler(webapp.RequestHandler):
             error += "<pre>Account: "+str(account)
             if account:
               error += "<pre>Token: "+str(account.spreedly_token)
-            self.response.out.write(template.render('templates/error.html', locals()))
+            self.response.out.write(render('templates/error.html', locals()))
             return
           auto_signin = account.auto_signin
-          self.response.out.write(template.render('templates/pref.html', locals()))
+          self.response.out.write(render('templates/pref.html', locals()))
 
    def post(self):
       user = users.get_current_user()
@@ -358,45 +379,56 @@ class PrefHandler(webapp.RequestHandler):
       account = Membership.all().filter('username =', user.nickname()).get()
       if not account:
             error = "<p>Error #1983, which should never happen."
-            self.response.out.write(template.render('templates/error.html', locals()))
+            self.response.out.write(render('templates/error.html', locals()))
             return
       auto_signin = self.request.get('auto').strip()
       account.auto_signin = auto_signin
       account.put()
-      self.response.out.write(template.render('templates/prefsaved.html', locals()))
+      self.response.out.write(render('templates/prefsaved.html', locals()))
  
             
 
 class KeyHandler(webapp.RequestHandler):
     def get(self):
-      user = users.get_current_user()
-      if not user:
-          self.redirect(users.create_login_url('/key'))
-          return
-      else:
-          account = Membership.all().filter('username =', user.nickname()).get()
-          if not account or not account.spreedly_token:
-            error = "<p>It appears that you have an account on @hackerdojo.com, but you do not have a corresponding account in the signup application.</p><p>How to remedy:</p><ol><li>If you <b>are not</b> in the Spreedly system yet, <a href=\"/\">sign up</a> now.</li><li>If you <b>are</b> in Spreedly already, please contact <a href=\"mailto:signupops@hackerdojo.com?Subject=Spreedly+account+not+linked+to+hackerdojo+account\">signupops@hackerdojo.com</a>.</li></ol>"
-            error += "<pre>Nick: "+str(user.nickname())
-            error += "<pre>Email: "+str(user.email())
-            error += "<pre>Account: "+str(account)
-            if account:
-              error += "<pre>Token: "+str(account.spreedly_token)
+        user = users.get_current_user()
+        if not user:
+            self.redirect(users.create_login_url('/key'))
+            return
+        else:
+            account = Membership.all().filter('username =', user.nickname()).get()
+            if not account or not account.spreedly_token:
+                error = """<p>It appears that you have an account on @%(domain)s, but you do not have a corresponding account in the signup application.</p>
+<p>How to remedy:</p>
+<ol><li>If you <b>are not</b> in the Spreedly system yet, <a href=\"/\">sign up</a> now.</li>
+<li>If you <b>are</b> in Spreedly already, please contact <a href=\"mailto:%(signup_email)s?Subject=Spreedly+account+not+linked+to+account\">%(signup_email)s</a>.</li></ol>
+<pre>Nick: %(nick)s</pre>
+<pre>Email: %(email)s</pre>
+<pre>Account: %(account)s</pre>
+""" % {'domain': APPS_DOMAIN, 'signup_email': SIGNUP_HELP_EMAIL, 'nick': user.nickname(), 'email': user.email(), 'account': account}
+                if account:
+                    error += "<pre>Token: %s</pre>" % account.spreedly_token
             
-            self.response.out.write(template.render('templates/error.html', locals()))
-            return
-          if account.status != "active":
-            url = "https://spreedly.com/"+SPREEDLY_ACCOUNT+"/subscriber_accounts/"+account.spreedly_token
-            error = "<p>Your Spreedly account status does not appear to me marked as active.  This might be a mistake, in which case we apologize. <p>To investigate your account, you may go here: <a href=\""+url+"\">"+url+"</a> <p>If you believe this message is in error, please contact <a href=\"mailto:signupops@hackerdojo.com?Subject=Spreedly+account+not+linked+to+hackerdojo+account\">signupops@hackerdojo.com</a></p>";
-            self.response.out.write(template.render('templates/error.html', locals()))
-            return
-          delta = datetime.utcnow() - account.created
-          if delta.days < DAYS_FOR_KEY:
-            error = "<p>You have been a member for "+str(delta.days)+" days.  After "+str(DAYS_FOR_KEY)+" days you qualify for a key.  Check back in "+str(DAYS_FOR_KEY-delta.days)+" days!</p><p>If you believe this message is in error, please contact <a href=\"mailto:signupops@hackerdojo.com?Subject=Membership+create+date+not+correct\">signupops@hackerdojo.com</a>.</p>";
-            self.response.out.write(template.render('templates/error.html', locals()))
-            return    
-          bc = BadgeChange.all().filter('username =', account.username).fetch(100)
-          self.response.out.write(template.render('templates/key.html', locals()))
+                self.response.out.write(render('templates/error.html', locals()))
+                return
+            if account.status != "active":
+                url = "https://spreedly.com/"+SPREEDLY_ACCOUNT+"/subscriber_accounts/"+account.spreedly_token
+                error = """<p>Your Spreedly account status does not appear to me marked as active.  
+This might be a mistake, in which case we apologize. </p>
+<p>To investigate your account, you may go here: <a href=\"%(url)s\">%(url)s</a> </p>
+<p>If you believe this message is in error, please contact <a href=\"mailto:%(signup_email)s?Subject=Spreedly+account+not+linked+to+account\">%(signup_email)s</a></p>
+""" % {'url': url, 'signup_email': SIGNUP_HELP_EMAIL}
+                self.response.out.write(render('templates/error.html', locals()))
+                return
+            delta = datetime.utcnow() - account.created
+            if delta.days < DAYS_FOR_KEY:
+                error = """<p>You have been a member for %(days)s days.  
+After %(days)s days you qualify for a key.  Check back in %(delta)s days!</p>
+<p>If you believe this message is in error, please contact <a href=\"mailto:%(signup_email)s?Subject=Membership+create+date+not+correct\">%(signup_email)s</a>.</p>
+""" % {'days': DAYS_FOR_KEY, 'delta': DAYS_FOR_KEY-delta.days, 'signup_email': SIGNUP_HELP_EMAIL}
+                self.response.out.write(render('templates/error.html', locals()))
+                return    
+            bc = BadgeChange.all().filter('username =', account.username).fetch(100)
+            self.response.out.write(render('templates/key.html', locals()))
 
     def post(self):
       user = users.get_current_user()
@@ -406,28 +438,28 @@ class KeyHandler(webapp.RequestHandler):
       account = Membership.all().filter('username =', user.nickname()).get()
       if not account or not account.spreedly_token or account.status != "active":
             error = "<p>Error #1982, which should never happen."
-            self.response.out.write(template.render('templates/error.html', locals()))
+            self.response.out.write(render('templates/error.html', locals()))
             return
       rfid_tag = self.request.get('rfid_tag').strip()
       description = self.request.get('description').strip()
       if rfid_tag.isdigit():
         if Membership.all().filter('rfid_tag =', rfid_tag).get():
           error = "<p>That RFID tag is in use by someone else.</p>"
-          self.response.out.write(template.render('templates/error.html', locals()))
+          self.response.out.write(render('templates/error.html', locals()))
           return
         if not description:
           error = "<p>Please enter a reason why you are associating a replacement RFID key.  Please hit BACK and try again.</p>"
-          self.response.out.write(template.render('templates/error.html', locals()))
+          self.response.out.write(render('templates/error.html', locals()))
           return
         account.rfid_tag = rfid_tag
         account.put()
         bc = BadgeChange(rfid_tag = rfid_tag, username=account.username, description=description)
         bc.put()
-        self.response.out.write(template.render('templates/key_ok.html', locals()))
+        self.response.out.write(render('templates/key_ok.html', locals()))
         return
       else:
         error = "<p>That RFID ID seemed invalid. Hit back and try again.</p>"
-        self.response.out.write(template.render('templates/error.html', locals()))
+        self.response.out.write(render('templates/error.html', locals()))
         return
 
 class RFIDHandler(webapp.RequestHandler):
@@ -437,7 +469,7 @@ class RFIDHandler(webapp.RequestHandler):
         if self.request.get('callback'): # jsonp callback support
           self.response.out.write(self.request.get('callback')+"(");
         if m:
-          email = m.username + "@hackerdojo.com"
+          email = '%s@%s' % (m.username, APPS_DOMAIN)
           gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest()
           self.response.out.write(simplejson.dumps({"gravatar": gravatar_url,"auto_signin":m.auto_signin, "status" : m.status, "name" : m.first_name + " " + m.last_name, "rfid_tag" : m.rfid_tag, "username" : m.username }))
         else:
@@ -459,17 +491,14 @@ class ModifyHandler(webapp.RequestHandler):
       else:
           account = Membership.all().filter('username =', user.nickname()).get()
           if not account or not account.spreedly_token:
-            error = "<p>Sorry, your hackerdojo account does not appear to be linked to a Spreedly account.  Please contact <a href=\"mailto:treasurer@hackerdojo.com\">treasurer@hackerdojo.com</a> so they can manually update your account."
-            self.response.out.write(template.render('templates/error.html', locals()))
+            error = """"<p>Sorry, your %(name)s account does not appear to be linked to a Spreedly account.  
+Please contact <a href=\"mailto:%(treasurer)s\">%(treasurer)s</a> so they can manually update your account.
+""" % {'treasurer': TREASURER_EMAIL, 'name': ORG_NAME}
+            self.response.out.write(render('templates/error.html', locals()))
             return
           url = "https://spreedly.com/"+SPREEDLY_ACCOUNT+"/subscriber_accounts/"+account.spreedly_token
           self.redirect(url)
           
-class BadgeChange(db.Model):
-    created = db.DateTimeProperty(auto_now_add=True)
-    rfid_tag = db.StringProperty()    
-    username = db.StringProperty()
-    description = db.StringProperty()
 
 def main():
     application = webapp.WSGIApplication([
