@@ -5,6 +5,7 @@ from google.appengine.ext import webapp
 from google.appengine.api import urlfetch, mail, memcache, users, taskqueue
 from google.appengine.ext.webapp import template
 from django.utils import simplejson
+from django.utils.html import escape
 from pprint import pprint
 from datetime import datetime, date, time
 import logging
@@ -175,7 +176,7 @@ class AccountHandler(webapp.RequestHandler):
             username = membership.email.split('@')[0].lower()
         if self.request.get('u'):
             pick_username = True
-        message = self.request.get('message')
+        message = escape(self.request.get('message'))
         self.response.out.write(render('templates/account.html', locals()))
     
     def post(self, hash):
@@ -281,7 +282,7 @@ class SuccessHandler(webapp.RequestHandler):
 
 class NeedAccountHandler(webapp.RequestHandler):
     def get(self):
-        message = self.request.get('message')
+        message = escape(self.request.get('message'))
         self.response.out.write(render('templates/needaccount.html', locals()))
     
     def post(self):
