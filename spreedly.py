@@ -6,9 +6,6 @@ SITE_NAME = 'your-site'
 SPREEDLY_BASE_URL = 'https://spreedly.com/api/v4/%(site)s/'
 SPREEDLY_TOKEN = 'your-token'
 
-def basic_auth(user, password):
-    return "Basic %s" % base64.b64encode('%s:%s' % (user, password))[:-1]
-
 
 def remove_whitespace_nodes(node, unlink=True):
     remove_list = set()

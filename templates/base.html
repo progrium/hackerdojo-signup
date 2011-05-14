@@ -1,13 +1,13 @@
 <html>
   <head>
-    <title>Hacker Dojo Member Signup</title>
+    <title>{{org_name}} Member Signup</title>
     <link href="/static/style.css" type="text/css" rel="stylesheet" />
   </head>
   <body>
     <div id="wrapper">
       <div id="header">
         <img src="/static/dojo_icon.png" style="float: left; " />
-        <h1>Hacker Dojo</h1>
+        <h1>{{org_name}}</h1>
         <h2>Member Signup</h2>
       </div>
       <div id="content">
@@ -21,7 +21,7 @@
     </script>
     <script type="text/javascript">
     try {
-    var pageTracker = _gat._getTracker("UA-11332872-2");
+    var pageTracker = _gat._getTracker("{{analytics_id}}");
     pageTracker._trackPageview();
     } catch(err) {}</script>
     {% endif %}

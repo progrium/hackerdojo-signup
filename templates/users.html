@@ -35,13 +35,13 @@ h3 {margin-top:3em}
 {% endfor %}
 </table>
 
-<h3>@Hackerdojo.com Domain users not found in Signup application</h3>
+<h3>@{{domain}} Domain users not found in Signup application</h3>
 
 {% for u in users_not_on_signup %}  
 {{ u }},  
 {% endfor %}  
 
-<h3>Signup users not found in hackerdojo domain</h3>
+<h3>Signup users not found in {{org_name}} domain</h3>
 
 {% for u in users_not_on_domain %}  
 {{ u }},  
