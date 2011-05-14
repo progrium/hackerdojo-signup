@@ -107,31 +107,65 @@ class MainHandler(webapp.RequestHandler):
     def post(self):
         first_name = self.request.get('first_name')
         last_name = self.request.get('last_name')
-        email = self.request.get('email')
+        email = self.request.get('email').lower()
         plan = self.request.get('plan', 'full')
         
         if not first_name or not last_name or not email:
             self.response.out.write(render('templates/main.html', {
                 'plan': plan, 'message': "Sorry, we need all three fields."}))
         else:
-            existing_member = Membership.get_by_email(email)
-            if existing_member and existing_member.status in [None, 'paypal']:
-                existing_member.delete()
             
-            membership = Membership(
-                first_name=first_name, last_name=last_name, email=email, plan=plan)
-            if self.request.get('paypal') == '1':
-                membership.status = 'paypal'
-            membership.hash = hashlib.md5(membership.email).hexdigest()
-            membership.referrer = self.request.get('referrer')
-            membership.put()
-            
-            self.redirect('/account/%s' % membership.hash)
+            # this just runs a check twice. (there is no OR in GQL)
+            # first name, last name
+            existing_member = db.GqlQuery("SELECT * FROM Membership WHERE first_name = '%s' AND last_name = '%s'" % (first_name, last_name)).get()
+            if existing_member:
+                membership = existing_member
+            # email
+            existing_member = db.GqlQuery("SELECT * FROM Membership WHERE email = '%s'" % email).get()
+            if existing_member:
+                membership = existing_member
 
+            first_part = re.compile(r'[^\w]').sub('', first_name.split(' ')[0])
+            last_part = re.compile(r'[^\w]').sub('', last_name)
+            if len(first_part)+len(last_part) >= 15:
+                last_part = last_part[0]
+            username = '.'.join([first_part, last_part]).lower()
+            if username in fetch_usernames():
+                username = email.split('@')[0].lower()
+            
+            # username@hackerdojo.com
+            existing_member = db.GqlQuery("SELECT * FROM Membership WHERE email = '%s@hackerdojo.com'" % username).get()
+            if existing_member:
+                membership = existing_member
+            
+            try:
+                membership
+            except NameError:
+                membership = None
+                
+            # old code below
+            #existing_member = Membership.get_by_email(email)
+            #if existing_member and existing_member.status in [None, 'paypal']:
+            #    existing_member.delete()
+            if membership is None:
+                membership = Membership(
+                    first_name=first_name, last_name=last_name, email=email, plan=plan)
+                if self.request.get('paypal') == '1':
+                    membership.status = 'paypal'
+                membership.hash = hashlib.md5(membership.email).hexdigest()
+                membership.referrer = self.request.get('referrer')
+                membership.put()
+            
+            # if there is a membership, redirect here
+            if membership.status != "active":
+              self.redirect('/account/%s' % membership.hash)
+            else:
+              self.redirect("https://www.spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, membership.spreedly_token))
+            
 class AccountHandler(webapp.RequestHandler):
     def get(self, hash):
         membership = Membership.get_by_hash(hash)
-        
+        # steal this part to detect if they registered with hacker dojo email above
         first_part = re.compile(r'[^\w]').sub('', membership.first_name.split(' ')[0]) # First word of first name
         last_part = re.compile(r'[^\w]').sub('', membership.last_name)
         if len(first_part)+len(last_part) >= 15:
@@ -176,9 +210,11 @@ class AccountHandler(webapp.RequestHandler):
             
             query_str = urllib.urlencode({'first_name': membership.first_name, 'last_name': membership.last_name, 
                 'email': membership.email, 'return_url': 'http://%s/success/%s' % (self.request.host, membership.hash)})
+            # check if they are active already since we didn't create a new member above
+            # apparently the URL will be different
             self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % 
                 (SPREEDLY_ACCOUNT, customer_id, PLAN_IDS[membership.plan], username, query_str))
-            
+
             
 class CreateUserTask(webapp.RequestHandler):
     def post(self):
@@ -249,7 +285,7 @@ class NeedAccountHandler(webapp.RequestHandler):
         self.response.out.write(render('templates/needaccount.html', locals()))
     
     def post(self):
-        email = self.request.get('email')
+        email = self.request.get('email').lower()
         if not email:
             self.redirect(self.request.path)
         else:
