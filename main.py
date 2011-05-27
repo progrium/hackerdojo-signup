@@ -385,7 +385,7 @@ class SuspendedHandler(webapp.RequestHandler):
       if not user:
         self.redirect(users.create_login_url('/suspended'))
       if users.is_current_user_admin():
-        suspended_users = Membership.all().filter('status =', 'suspended').fetch(1000)
+        suspended_users = Membership.all().filter('status =', 'suspended').filter('last_name !=', 'Deleted').fetch(1000)
         suspended_users = sorted(suspended_users, key=lambda user: user.last_name.lower())        
         total = len(suspended_users)
         reasonable = 0
