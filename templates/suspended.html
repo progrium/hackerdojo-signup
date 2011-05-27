@@ -19,16 +19,16 @@ h3 {margin-top:3em}
 <table class="log" width="100%" cellspacing="0" cellpadding="0" border="0">
 <tr class="header">
   <td>Name</td>
+  <td>Spreedly</td>
   <td>Plan</td>
-  <td>Linked</td>
   <td>Reason</td>
 </tr>
 
 {% for u in suspended_users %}  
   <tr>
     <td><a href="https://appengine.google.com/datastore/edit?app_id=hd-signup&key={{u.key}}">{{ u.last_name }}, {{ u.first_name }}</a></td>
+    <td><a href="{{ u.spreedly_admin_url }}">{{u.key.id}}</a></td>
     <td>{{ u.plan }}</td>
-    <td {% if not u.spreedly_token %}class="bad"{% endif %}>{% if u.spreedly_token %}Yes{% else %}No{% endif %}</td>
     <td {% if not u.unsubscribe_reason %}class="bad"{% endif %}>{% if u.unsubscribe_reason %}{{u.unsubscribe_reason}}{% else %}None{% endif %}</td>
   </tr>
 {% endfor %}

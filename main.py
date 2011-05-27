@@ -92,11 +92,15 @@ class Membership(db.Model):
     def spreedly_url(self):
         return "https://spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, self.spreedly_token)
 
+    def spreedly_admin_url(self):
+        return "https://spreedly.com/%s/subscribers/%s" % (SPREEDLY_ACCOUNT, self.key().id())
+
     def subscribe_url(self):
         return "https://spreedly.com/%s/subscribers/%i/%s/subscribe/%s" % (SPREEDLY_ACCOUNT, self.key().id(), self.spreedly_token, PLAN_IDS[self.plan])
 
     def unsubscribe_url(self):
         return "http://signup.hackerdojo.com/unsubscribe/%i" % (self.key().id())
+        
     
     @classmethod
     def get_by_email(cls, email):
@@ -386,7 +390,11 @@ class SuspendedHandler(webapp.RequestHandler):
         self.redirect(users.create_login_url('/suspended'))
       if users.is_current_user_admin():
         suspended_users = Membership.all().filter('status =', 'suspended').filter('last_name !=', 'Deleted').fetch(1000)
-        suspended_users = sorted(suspended_users, key=lambda user: user.last_name.lower())        
+        tokened_users = []
+        for user in suspended_users:
+            if user.spreedly_token:
+                tokened_users.append(user)
+        suspended_users = sorted(tokened_users, key=lambda user: user.last_name.lower())        
         total = len(suspended_users)
         reasonable = 0
         for user in suspended_users:

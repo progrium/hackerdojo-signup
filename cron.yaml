@@ -3,7 +3,7 @@ cron:
   url: /cleanup
   schedule: every 24 hours
   
-- description: cleanup member records
+- description: email suspended users
   url: /areyoustillthere
   schedule: every 1 week
     
