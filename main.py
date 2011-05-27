@@ -219,7 +219,7 @@ class AccountHandler(webapp.RequestHandler):
             
 class CreateUserTask(webapp.RequestHandler):
     def post(self):
-        def fail(what, details):
+        def fail(details):
             mail.send_mail(sender=EMAIL_FROM,
                 to=INTERNAL_DEV_EMAIL,
                 subject="[%s] CreateUserTask failure" % APP_NAME,
@@ -537,7 +537,7 @@ class ModifyHandler(webapp.RequestHandler):
       else:
           account = Membership.all().filter('username =', user.nickname()).get()
           if not account or not account.spreedly_token:
-            error = """"<p>Sorry, your %(name)s account does not appear to be linked to a Spreedly account.  
+            error = """<p>Sorry, your %(name)s account does not appear to be linked to a Spreedly account.  
 Please contact <a href=\"mailto:%(treasurer)s\">%(treasurer)s</a> so they can manually update your account.
 """ % {'treasurer': TREASURER_EMAIL, 'name': ORG_NAME}
             self.response.out.write(render('templates/error.html', locals()))
