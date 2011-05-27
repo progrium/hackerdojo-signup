@@ -411,9 +411,9 @@ class AreYouStillThereMail(webapp.RequestHandler):
     def post(self): 
         user = Membership.get_by_id(int(self.request.get('user')))
         subject = "Hacker Dojo Membership"
-        body = render('templates/areyoustillthere.txt', locals()
-        to="%s <%s>" % (user.full_name(), member.email),
-        bcc="%s <%s>" % ("Brian Klug", "brian.klug@hackerdojo.com"),
+        body = render('templates/areyoustillthere.txt', locals())
+        to = "%s <%s>" % (user.full_name(), user.email)
+        bcc = "%s <%s>" % ("Brian Klug", "brian.klug@hackerdojo.com")
         if user.username:
             cc="%s <%s@hackerdojo.com>" % (user.full_name(), user.username),
             mail.send_mail(sender=EMAIL_FROM, to=to, subject=subject, body=body, bcc=bcc, cc=cc)
