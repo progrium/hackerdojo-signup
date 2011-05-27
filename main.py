@@ -356,7 +356,7 @@ class AllHandler(webapp.RequestHandler):
         signup_usernames = [m.lower() for m in signup_usernames]
         users_not_on_domain = set(signup_usernames) - set(domain_usernames)
         users_not_on_signup = set(domain_usernames) - set(signup_usernames)
-        signup_users = sorted(signup_users, key=lambda user: user.last_name)
+        signup_users = sorted(signup_users, key=lambda user: user.last_name.lower)
         self.response.out.write(render('templates/users.html', locals()))
       else:
         self.response.out.write("Need admin access")
