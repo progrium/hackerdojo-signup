@@ -2,7 +2,6 @@
 {% block content %}
 
 
-
 <h2>User List</h2>
 
 <style>
@@ -25,7 +24,7 @@ h3 {margin-top:3em}
 
 {% for u in signup_users %}  
   <tr>
-    <td><a href="https://appengine.google.com/datastore/edit?app_id=hd-signup&key={{u.key}}">{{ u.first_name }} {{ u.last_name }}</a></td>
+    <td><a href="https://appengine.google.com/datastore/edit?app_id=hd-signup&key={{u.key}}">{{ u.last_name }}, {{ u.first_name }}</a></td>
     <td {% if not u.username%}class="bad"{% endif %}>{{ u.username }}</td>
     <td>{{ u.plan }}</td>
     <td {% if not u.status %}class="bad"{% endif %}>{{ u.status }}</td>

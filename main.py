@@ -356,6 +356,7 @@ class AllHandler(webapp.RequestHandler):
         signup_usernames = [m.lower() for m in signup_usernames]
         users_not_on_domain = set(signup_usernames) - set(domain_usernames)
         users_not_on_signup = set(domain_usernames) - set(signup_usernames)
+        signup_users = sorted(signup_users, key=lambda user: user.last_name)
         self.response.out.write(render('templates/users.html', locals()))
       else:
         self.response.out.write("Need admin access")
@@ -365,17 +366,25 @@ class CleanupHandler(webapp.RequestHandler):
         self.post()
         
     def post(self):
-        deleted_emails = []
+        countdown = 0
         for membership in Membership.all().filter('status =', None):
-            if (datetime.date.today() - membership.created.date()).days > 5:
-                deleted_emails.append(membership.email)
-                membership.delete()
-        if deleted_emails:
-            mail.send_mail(sender=EMAIL_FROM,
-                to="Jeff Lindsay <progrium@gmail.com>",
-                subject="Recent almost members",
-                body='\n'.join(deleted_emails))
+            if (datetime.now().date() - membership.created.date()).days >= 0:
+                countdown += 90
+                self.response.out.write("bye "+membership.email+ " ")
+                taskqueue.add(url='/tasks/clean_row', params={'user': membership.key().id()}, countdown=countdown)
 
+
+class CleanupTask(webapp.RequestHandler):
+    def post(self): 
+        user = Membership.get_by_id(int(self.request.get('user')))
+        mail.send_mail(sender=EMAIL_FROM,
+             to=user.email,
+             subject="Hi again -- from Hacker Dojo!",
+             body="Hi "+user.first_name+",\n\nOur fancy membership system noted that you started filling out the Membership Signup form, but didn't complete it.\n\nWell -- We'd love to have you as a member!\n\n Hacker Dojo is growing in many ways -- 100mbps Fiber Internet, expansion plans, new furniture, and much more.  Give us a try?\n\nIf you would like to become a member of Hacker Dojo, just complete the signup process at http://signup.hackerdojo.com\n\nIf you don't want to sign up -- please give us anonymous feedback so we know how we can do better!  URL: http://bit.ly/jJAGYM\n\n Cheers!\nHacker Dojo\n\nPS: Please ignore this e-mail if you already signed up -- you might have started signing up twice or something :)\nPSS: This is an automated e-mail and we're now deleting your e-mail address from the signup application"
+        )
+        user.delete()
+        
+        
 class ProfileHandler(webapp.RequestHandler):
     def get(self):
       user = users.get_current_user()
@@ -555,6 +564,9 @@ def main():
         ('/memberlist', MemberListHandler),
         ('/update', UpdateHandler),
         ('/tasks/create_user', CreateUserTask),
+        ('/tasks/clean_row', CleanupTask),
+        
+        
         ], debug=True)
     wsgiref.handlers.CGIHandler().run(application)
 
