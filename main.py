@@ -188,49 +188,55 @@ class AccountHandler(webapp.RequestHandler):
             self.redirect(self.request.path + "?message=Password must be 6 characters or longer")
         else:
             membership = Membership.get_by_hash(hash)
-            membership.put()
+            if membership.username:
+                self.redirect(self.request.path + "?message=You already have a user account")
+                return
             
             # Yes, storing their username and password temporarily so we can make their account later
             memcache.set(hashlib.sha1(membership.hash+SPREEDLY_APIKEY).hexdigest(), 
                 '%s:%s' % (username, password), time=3600)
             
-            customer_id = membership.key().id()
-
-            # This code is weird...
-            if "maker00000" in membership.referrer.lower():
-                headers = {'Authorization': "Basic %s" % base64.b64encode('%s:X' % SPREEDLY_APIKEY),
-                    'Content-Type':'application/xml'}
-                # Create subscriber
-                data = "<subscriber><customer-id>%s</customer-id><email>%s</email></subscriber>" % (customer_id, membership.email)
-                resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers.xml" % (SPREEDLY_ACCOUNT), 
-                        method='POST', payload=data, headers = headers, deadline=5)
-                # Credit
-                data = "<credit><amount>30.00</amount></credit>"
-                resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers/%s/credits.xml" % (SPREEDLY_ACCOUNT, customer_id), 
-                        method='POST', payload=data, headers=headers, deadline=5)
-            
-            query_str = urllib.urlencode({'first_name': membership.first_name, 'last_name': membership.last_name, 
-                'email': membership.email, 'return_url': 'http://%s/success/%s' % (self.request.host, membership.hash)})
-            # check if they are active already since we didn't create a new member above
-            # apparently the URL will be different
-            self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % 
-                (SPREEDLY_ACCOUNT, customer_id, PLAN_IDS[membership.plan], username, query_str))
+            if membership.status == 'active':
+                taskqueue.add(url='/tasks/create_user', method='POST', params={'hash': membership.hash})
+                self.redirect('http://%s/success/%s' % (self.request.host, membership.hash))
+            else:
+                customer_id = membership.key().id()
+                
+                # This code is weird...
+                if "maker00000" in membership.referrer.lower():
+                    headers = {'Authorization': "Basic %s" % base64.b64encode('%s:X' % SPREEDLY_APIKEY),
+                        'Content-Type':'application/xml'}
+                    # Create subscriber
+                    data = "<subscriber><customer-id>%s</customer-id><email>%s</email></subscriber>" % (customer_id, membership.email)
+                    resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers.xml" % (SPREEDLY_ACCOUNT), 
+                            method='POST', payload=data, headers = headers, deadline=5)
+                    # Credit
+                    data = "<credit><amount>30.00</amount></credit>"
+                    resp = urlfetch.fetch("https://spreedly.com/api/v4/%s/subscribers/%s/credits.xml" % (SPREEDLY_ACCOUNT, customer_id), 
+                            method='POST', payload=data, headers=headers, deadline=5)
+                
+                query_str = urllib.urlencode({'first_name': membership.first_name, 'last_name': membership.last_name, 
+                    'email': membership.email, 'return_url': 'http://%s/success/%s' % (self.request.host, membership.hash)})
+                # check if they are active already since we didn't create a new member above
+                # apparently the URL will be different
+                self.redirect("https://spreedly.com/%s/subscribers/%s/subscribe/%s/%s?%s" % 
+                    (SPREEDLY_ACCOUNT, customer_id, PLAN_IDS[membership.plan], username, query_str))
 
             
 class CreateUserTask(webapp.RequestHandler):
     def post(self):
-        def fail(details):
+        def fail(exception):
             mail.send_mail(sender=EMAIL_FROM,
                 to=INTERNAL_DEV_EMAIL,
                 subject="[%s] CreateUserTask failure" % APP_NAME,
-                body=details)
+                body=exception)
         def retry(countdown=None):
             retries = int(self.request.get('retries', 0)) + 1
             if retries <= 5:
                 taskqueue.add(url='/tasks/create_user', method='POST', countdown=countdown,
                     params={'hash': self.request.get('hash'), 'retries': retries})
             else:
-                fail("Too many retries")
+                fail(Exception("Too many retries for %s" % self.request.get('hash')))
         
         membership = Membership.get_by_hash(self.request.get('hash'))
         if membership is None or membership.username:
@@ -241,7 +247,7 @@ class CreateUserTask(webapp.RequestHandler):
         try:
             username, password = memcache.get(hashlib.sha1(membership.hash+SPREEDLY_APIKEY).hexdigest()).split(':')
         except (AttributeError, ValueError):
-            return fail("Account information expired")
+            return fail(Exception("Account information expired for %s" % membership.email))
             
         try:
             resp = urlfetch.fetch('http://%s/users' % DOMAIN_HOST, method='POST', payload=urllib.urlencode({
