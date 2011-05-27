@@ -79,6 +79,7 @@ class Membership(db.Model):
     username = db.StringProperty()
     rfid_tag = db.StringProperty()
     auto_signin = db.StringProperty()
+    unsubscribe_reason = db.TextProperty()
     
     spreedly_token = db.StringProperty()
     
@@ -90,6 +91,12 @@ class Membership(db.Model):
     
     def spreedly_url(self):
         return "https://spreedly.com/%s/subscriber_accounts/%s" % (SPREEDLY_ACCOUNT, self.spreedly_token)
+
+    def subscribe_url(self):
+        return "https://spreedly.com/%s/subscribers/%i/%s/subscribe/%s" % (SPREEDLY_ACCOUNT, self.key().id(), self.spreedly_token, PLAN_IDS[self.plan])
+
+    def unsubscribe_url(self):
+        return "http://signup.hackerdojo.com/unsubscribe/%i" % (self.key().id())
     
     @classmethod
     def get_by_email(cls, email):
@@ -269,6 +276,27 @@ class CreateUserTask(webapp.RequestHandler):
         else:
             return retry()
 
+class UnsubscribeHandler(webapp.RequestHandler):
+    def get(self, id):
+        member = Membership.get_by_id(int(id))
+        if member:
+            self.response.out.write(render('templates/unsubscribe.html', locals()))
+        else:
+            self.response.out.write("error: could not locate your membership record.")
+
+    def post(self,id):
+        member = Membership.get_by_id(int(id))
+        if member:
+            unsubscribe_reason = self.request.get('unsubscribe_reason')
+            if unsubscribe_reason:
+                member.unsubscribe_reason = unsubscribe_reason
+                member.put()
+                self.response.out.write(render('templates/unsubscribe_thanks.html', locals()))
+            else:
+                self.response.out.write(render('templates/unsubscribe_error.html', locals()))
+        else:
+            self.response.out.write("error: could not locate your membership record.")
+                
 class SuccessHandler(webapp.RequestHandler):
     def get(self, hash):
         member = Membership.get_by_hash(hash)
@@ -367,6 +395,32 @@ class AllHandler(webapp.RequestHandler):
       else:
         self.response.out.write("Need admin access")
       
+class AreYouStillThereHandler(webapp.RequestHandler):
+    def get(self):
+        self.post()
+        
+    def post(self):
+        countdown = 0
+        for membership in Membership.all().filter('status =', "suspended"):
+          if not membership.unsubscribe_reason and membership.spreedly_url:
+            countdown += 90
+            self.response.out.write("Are you still there "+membership.email+ "?<br/>")
+            taskqueue.add(url='/tasks/areyoustillthere_mail', params={'user': membership.key().id()}, countdown=countdown)
+
+class AreYouStillThereMail(webapp.RequestHandler):
+    def post(self): 
+        user = Membership.get_by_id(int(self.request.get('user')))
+        subject = "Hacker Dojo Membership"
+        body = render('templates/areyoustillthere.txt', locals()
+        to="%s <%s>" % (user.full_name(), member.email),
+        bcc="%s <%s>" % ("Brian Klug", "brian.klug@hackerdojo.com"),
+        if user.username:
+            cc="%s <%s@hackerdojo.com>" % (user.full_name(), user.username),
+            mail.send_mail(sender=EMAIL_FROM, to=to, subject=subject, body=body, bcc=bcc, cc=cc)
+        else:
+            mail.send_mail(sender=EMAIL_FROM, to=to, subject=subject, body=body, bcc=bcc)
+        
+        
 class CleanupHandler(webapp.RequestHandler):
     def get(self):
         self.post()
@@ -568,9 +622,12 @@ def main():
         ('/upgrade/needaccount', NeedAccountHandler),
         ('/success/(.+)', SuccessHandler),
         ('/memberlist', MemberListHandler),
+        ('/areyoustillthere', AreYouStillThereHandler),
+        ('/unsubscribe/(.*)', UnsubscribeHandler),
         ('/update', UpdateHandler),
         ('/tasks/create_user', CreateUserTask),
         ('/tasks/clean_row', CleanupTask),
+        ('/tasks/areyoustillthere_mail', AreYouStillThereMail),
         
         
         ], debug=True)
