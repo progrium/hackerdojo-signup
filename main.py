@@ -354,6 +354,8 @@ class UpdateHandler(webapp.RequestHandler):
                 member.status = 'active' if subscriber['active'] == 'true' else 'suspended'
                 if member.status == 'active' and not member.username:
                     taskqueue.add(url='/tasks/create_user', method='POST', params={'hash': member.hash})
+                if member.status == 'active' and member.unsubscribe_reason:
+                    member.unsubscribe_reason = None
                 member.spreedly_token = subscriber['token']
                 member.plan = subscriber['feature-level'] or member.plan
                 member.email = subscriber['email']
@@ -365,7 +367,7 @@ class LinkedHandler(webapp.RequestHandler):
     def get(self):
         self.response.out.write(simplejson.dumps([m.username for m in Membership.all().filter('username !=', None)]))
 
-class SuspendedHandler(webapp.RequestHandler):
+class APISuspendedHandler(webapp.RequestHandler):
     def get(self):
         self.response.out.write(simplejson.dumps([[m.fullname(), m.username] for m in Membership.all().filter('status =', 'suspended')]))
 
@@ -376,7 +378,24 @@ class MemberListHandler(webapp.RequestHandler):
         self.redirect(users.create_login_url('/memberlist'))
       signup_users = Membership.all().order("last_name").fetch(1000);
       self.response.out.write(render('templates/memberlist.html', locals()))
-		
+
+class SuspendedHandler(webapp.RequestHandler):
+    def get(self):
+      user = users.get_current_user()
+      if not user:
+        self.redirect(users.create_login_url('/suspended'))
+      if users.is_current_user_admin():
+        suspended_users = Membership.all().filter('status =', 'suspended').fetch(1000)
+        suspended_users = sorted(suspended_users, key=lambda user: user.last_name.lower())        
+        total = len(suspended_users)
+        reasonable = 0
+        for user in suspended_users:
+            if user.unsubscribe_reason:
+                reasonable += 1
+        self.response.out.write(render('templates/suspended.html', locals()))
+      else:
+        self.response.out.write("Need admin access")
+        		
 class AllHandler(webapp.RequestHandler):
     def get(self):
       user = users.get_current_user()
@@ -384,12 +403,16 @@ class AllHandler(webapp.RequestHandler):
         self.redirect(users.create_login_url('/userlist'))
       if users.is_current_user_admin():
         signup_users = Membership.all().fetch(1000)
+        active_users = Membership.all().filter('status =', 'active').fetch(1000)
         signup_usernames = [m.username for m in signup_users]
         domain_usernames = fetch_usernames()
         signup_usernames = set(signup_usernames) - set([None])
         signup_usernames = [m.lower() for m in signup_usernames]
+        active_usernames = [m.username for m in active_users]
+        active_usernames = set(active_usernames) - set([None])
+        active_usernames = [m.lower() for m in active_usernames]
         users_not_on_domain = set(signup_usernames) - set(domain_usernames)
-        users_not_on_signup = set(domain_usernames) - set(signup_usernames)
+        users_not_on_signup = set(domain_usernames) - set(active_usernames)
         signup_users = sorted(signup_users, key=lambda user: user.last_name.lower())        
         self.response.out.write(render('templates/users.html', locals()))
       else:
@@ -611,8 +634,9 @@ def main():
         ('/', MainHandler),
         ('/api/rfid', RFIDHandler),
         ('/userlist', AllHandler),
+        ('/suspended', SuspendedHandler),
         ('/api/linked', LinkedHandler),
-        ('/api/suspended', SuspendedHandler),
+        ('/api/suspended', APISuspendedHandler),
         ('/cleanup', CleanupHandler),
         ('/profile', ProfileHandler),
         ('/key', KeyHandler),
