@@ -349,7 +349,7 @@ class UpdateHandler(webapp.RequestHandler):
                 body=str(exception))
             logging.error("User suspension failure: "+str(exception))
         try:
-            resp = urlfetch.fetch('http://%s/suspend/%s' % (DOMAIN_HOST,username), method='GET', deadline=10, payload=urllib.urlencode({'secret': keymaster.get(DOMAIN_USER)}))
+            resp = urlfetch.fetch('http://%s/suspend/%s' % (DOMAIN_HOST,username), method='POST', deadline=10, payload=urllib.urlencode({'secret': keymaster.get(DOMAIN_USER)}))
         except Exception, e:
             return fail(e)
 
@@ -361,7 +361,7 @@ class UpdateHandler(webapp.RequestHandler):
                 body=str(exception))
             logging.error("User restore failure: "+str(exception))
         try:
-            resp = urlfetch.fetch('http://%s/restore/%s' % (DOMAIN_HOST,username), method='GET', deadline=10, payload=urllib.urlencode({'secret': keymaster.get(DOMAIN_USER)}))
+            resp = urlfetch.fetch('http://%s/restore/%s' % (DOMAIN_HOST,username), method='POST', deadline=10, payload=urllib.urlencode({'secret': keymaster.get(DOMAIN_USER)}))
         except Exception, e:
             return fail(e)
 
