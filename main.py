@@ -226,6 +226,7 @@ class AccountHandler(webapp.RequestHandler):
 class CreateUserTask(webapp.RequestHandler):
     def post(self):
         def fail(exception):
+            logging.error("CreateUserTask failed: %s" % exception)
             mail.send_mail(sender=EMAIL_FROM,
                 to=INTERNAL_DEV_EMAIL,
                 subject="[%s] CreateUserTask failure" % APP_NAME,
@@ -242,6 +243,7 @@ class CreateUserTask(webapp.RequestHandler):
         if membership is None or membership.username:
             return
         if not membership.spreedly_token:
+            logging.warn("[CreateUserTask] No spreedly token yet, retrying")
             return retry(300)
             
         try:
@@ -258,6 +260,7 @@ class CreateUserTask(webapp.RequestHandler):
                 'secret': keymaster.get(DOMAIN_USER),
             }), deadline=10)
         except urlfetch.DownloadError, e:
+            logging.warn("[CreateUserTask] API response error or timeout, retrying")
             return retry()
         except Exception, e:
             return fail(e)
