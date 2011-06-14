@@ -2,3 +2,8 @@ cron:
 - description: cleanup member records
   url: /cleanup
   schedule: every 24 hours
+  
+- description: email suspended users
+  url: /areyoustillthere
+  schedule: every 1 week
+    

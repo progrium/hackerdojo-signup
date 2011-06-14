@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+
+<h2>Unsubscribe</h2>
+
+
+<form method=post style="margin:1em; padding:1em; background:#efe9fe; border:3px dashed #cab3fe; margin:0 auto; ">
+  
+  <label for="unsubscribe_reason">What could we have done better to keep you as a member? <span style="color:red;">* required</span></label>
+  
+  <textarea rows="4" cols="80" style="width:100%; margin:1em 0" name="unsubscribe_reason"></textarea>
+  <input type="submit" value="Unsubscribe" style="font-size:22px" />
+
+</form>
+
+
+    
+{% endblock %}

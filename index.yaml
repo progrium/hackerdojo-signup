@@ -13,4 +13,14 @@ indexes:
 - kind: Membership
   properties:
   - name: status
+  - name: last_name
+
+- kind: Membership
+  properties:
+  - name: status
   - name: rfid_tag
+
+- kind: Membership
+  properties:
+  - name: status
+  - name: unsubscribe_reason
