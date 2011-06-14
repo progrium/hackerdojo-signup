@@ -470,6 +470,7 @@ class AreYouStillThereHandler(webapp.RequestHandler):
         self.post()
         
     def post(self):
+        return # cron is implemented, this is not ready yet
         countdown = 0
         for membership in Membership.all().filter('status =', "suspended"):
           if not membership.unsubscribe_reason and membership.spreedly_token and "Deleted" not in membership.last_name:
