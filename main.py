@@ -440,7 +440,7 @@ class AreYouStillThereHandler(webapp.RequestHandler):
     def post(self):
         countdown = 0
         for membership in Membership.all().filter('status =', "suspended"):
-          if not membership.unsubscribe_reason and membership.spreedly_url:
+          if not membership.unsubscribe_reason and membership.spreedly_token and "Deleted" not in membership.last_name:
             countdown += 90
             self.response.out.write("Are you still there "+membership.email+ "?<br/>")
             taskqueue.add(url='/tasks/areyoustillthere_mail', params={'user': membership.key().id()}, countdown=countdown)
