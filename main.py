@@ -347,6 +347,30 @@ class NeedAccountHandler(webapp.RequestHandler):
                 self.response.out.write(render('templates/needaccount.html', locals()))
 
 class UpdateHandler(webapp.RequestHandler):
+    def suspend(self, username):
+        def fail(self, exception):
+            mail.send_mail(sender=EMAIL_FROM,
+                to=INTERNAL_DEV_EMAIL,
+                subject="[%s] User suspension failure: " % (APP_NAME,username),
+                body=str(exception))
+            logging.error("User suspension failure: "+str(exception))
+        try:
+            resp = urlfetch.fetch('http://%s/suspend/%s' % (DOMAIN_HOST,username), method='GET', deadline=10, payload=urllib.urlencode({'secret': keymaster.get(DOMAIN_USER)}))
+        except Exception, e:
+            return fail(e)
+
+    def restore(self, username):
+        def fail(exception):
+            mail.send_mail(sender=EMAIL_FROM,
+                to=INTERNAL_DEV_EMAIL,
+                subject="[%s] User restore failure: " % (APP_NAME,username),
+                body=str(exception))
+            logging.error("User restore failure: "+str(exception))
+        try:
+            resp = urlfetch.fetch('http://%s/restore/%s' % (DOMAIN_HOST,username), method='GET', deadline=10, payload=urllib.urlencode({'secret': keymaster.get(DOMAIN_USER)}))
+        except Exception, e:
+            return fail(e)
+
     def get(self):
         pass
     
@@ -371,6 +395,14 @@ class UpdateHandler(webapp.RequestHandler):
                 member.plan = subscriber['feature-level'] or member.plan
                 member.email = subscriber['email']
                 member.put()
+                # TODO: After a few months (now() = 06.13.2011), only suspend/restore if status CHANGED
+                # As of right now, we can't trust previous status, so lets take action on each call to /update
+                if member.status == 'active':
+                    logging.info("Restoring User: "+member.username)
+                    self.restore(member.username)
+                if member.status == 'suspended':
+                    logging.info("Suspending User: "+member.username)
+                    self.suspend(member.username)
 
         self.response.out.write("ok")
             
