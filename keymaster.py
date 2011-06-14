@@ -11,6 +11,8 @@ except ImportError:
         encrypt = classmethod(lambda k,x: x)
         decrypt = classmethod(lambda k,x: x)
 
+class KeymasterError(Exception): pass
+
 class Keymaster(db.Model):
     secret  = db.BlobProperty(required=True)
     
@@ -28,7 +30,7 @@ class Keymaster(db.Model):
     def decrypt(cls, key_name):
         k = cls.get_by_key_name(str(key_name))
         if not k:
-            raise Exception("Keymaster has no secret for %s" % key_name)
+            raise KeymasterError("Keymaster has no secret for %s" % key_name)
         return ARC4.new(os.environ['APPLICATION_ID']).encrypt(k.secret)
 
 def get(key):

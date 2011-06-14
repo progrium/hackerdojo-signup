@@ -241,7 +241,7 @@ class CreateUserTask(webapp.RequestHandler):
             mail.send_mail(sender=EMAIL_FROM,
                 to=INTERNAL_DEV_EMAIL,
                 subject="[%s] CreateUserTask failure" % APP_NAME,
-                body=exception)
+                body=str(exception))
         def retry(countdown=None):
             retries = int(self.request.get('retries', 0)) + 1
             if retries <= 5:
@@ -273,6 +273,9 @@ class CreateUserTask(webapp.RequestHandler):
         except urlfetch.DownloadError, e:
             logging.warn("CreateUserTask: API response error or timeout, retrying")
             return retry()
+        except keymaster.KeymasterError, e:
+            fail(e)
+            return retry(3600)
         except Exception, e:
             return fail(e)
         
