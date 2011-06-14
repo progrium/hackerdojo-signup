@@ -4,5 +4,5 @@ cron:
   schedule: every 24 hours
 - description: email suspended users
   url: /areyoustillthere
-  schedule: every 200 hours
+  schedule: every monday
     
