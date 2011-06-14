@@ -254,7 +254,7 @@ class CreateUserTask(webapp.RequestHandler):
         if membership is None or membership.username:
             return
         if not membership.spreedly_token:
-            logging.warn("[CreateUserTask] No spreedly token yet, retrying")
+            logging.warn("CreateUserTask: No spreedly token yet, retrying")
             return retry(300)
             
         try:
@@ -271,7 +271,7 @@ class CreateUserTask(webapp.RequestHandler):
                 'secret': keymaster.get(DOMAIN_USER),
             }), deadline=10)
         except urlfetch.DownloadError, e:
-            logging.warn("[CreateUserTask] API response error or timeout, retrying")
+            logging.warn("CreateUserTask: API response error or timeout, retrying")
             return retry()
         except Exception, e:
             return fail(e)
@@ -281,6 +281,7 @@ class CreateUserTask(webapp.RequestHandler):
             membership.username = username
             membership.put()
         else:
+            logging.warn("CreateUserTask: Username did not show up after creating, retrying")
             return retry()
 
 class UnsubscribeHandler(webapp.RequestHandler):
